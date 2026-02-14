@@ -59,6 +59,12 @@ jobs:
       - name: SAM build
         run: sam build --template-file infra/template.yaml
 
+      - name: Verify build includes httpx
+        run: |
+          echo "=== Build contents ==="
+          ls .aws-sam/build/BotFunction/
+          python -c "import sys; sys.path.insert(0, '.aws-sam/build/BotFunction'); import httpx; print(f'httpx {httpx.__version__} found')"
+
       - name: Delete stack if in failed state
         run: |
           STATUS=$(aws cloudformation describe-stacks \
@@ -85,7 +91,6 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --template-file infra/template.yaml \
             --parameter-overrides \
               TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }}
 
