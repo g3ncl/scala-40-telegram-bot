@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Scala 40 Telegram Bot
+
+Parameters:
+  TelegramBotToken:
+    Type: String
+    NoEcho: true
+    Description: Telegram bot token from BotFather
+
+Globals:
+  Function:
+    Timeout: 29
+    MemorySize: 128
+    Runtime: python3.12
+
+Resources:
+  BotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/handler.lambda_handler
+      CodeUri: ..
+      Environment:
+        Variables:
+          TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+          DYNAMODB_TABLE_PREFIX: Scala40
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GamesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LobbiesTable
+      Events:
+        WebhookApi:
+          Type: Api
+          Properties:
+            Path: /bot
+            Method: post
+
+  GamesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Scala40_Games
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: gameId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: gameId
+          KeyType: HASH
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Scala40_Users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  LobbiesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Scala40_Lobbies
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: lobbyId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lobbyId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+Outputs:
+  WebhookUrl:
+    Description: API Gateway endpoint URL for webhook
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/bot"
