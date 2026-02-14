@@ -59,6 +59,23 @@ jobs:
       - name: SAM build
         run: sam build --use-container --template-file infra/template.yaml
 
+      - name: Delete stack if in failed state
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name scala40-bot \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+          if [[ "$STATUS" == *"ROLLBACK"* || "$STATUS" == *"FAILED"* ]]; then
+            echo "Stack in $STATUS state, deleting..."
+            aws cloudformation delete-stack \
+              --stack-name scala40-bot \
+              --region ${{ secrets.AWS_REGION }}
+            aws cloudformation wait stack-delete-complete \
+              --stack-name scala40-bot \
+              --region ${{ secrets.AWS_REGION }}
+          fi
+
       - name: SAM deploy
         run: |
           sam deploy \
@@ -71,3 +88,14 @@ jobs:
             --template-file infra/template.yaml \
             --parameter-overrides \
               TelegramBotToken=${{ secrets.TELEGRAM_BOT_TOKEN }}
+
+      - name: Register Telegram webhook
+        run: |
+          WEBHOOK_URL=$(aws cloudformation describe-stacks \
+            --stack-name scala40-bot \
+            --query 'Stacks[0].Outputs[?OutputKey==`WebhookUrl`].OutputValue' \
+            --output text)
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/setWebhook" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"${WEBHOOK_URL}\"}"
