@@ -57,7 +57,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: SAM build
-        run: sam build --use-container --template-file infra/template.yaml
+        run: sam build --template-file infra/template.yaml
 
       - name: Delete stack if in failed state
         run: |
