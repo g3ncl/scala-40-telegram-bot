@@ -48,7 +48,7 @@ logger = logging.getLogger("scala40.engine")
 @dataclass
 class ActionResult:
     success: bool
-    game: GameState
+    game: GameState | None = None
     error: str | None = None
     events: list[dict] = field(default_factory=list)
 
@@ -89,7 +89,9 @@ class GameEngine:
             updated_at=self._now(),
         )
         self._repo.save_game(game)
-        return self._repo.get_game(game_id)
+        result = self._repo.get_game(game_id)
+        assert result is not None
+        return result
 
     def start_round(self, game_id: str) -> ActionResult:
         """Start a new round (smazzata): shuffle, deal, set first player."""
@@ -142,7 +144,7 @@ class GameEngine:
         game.updated_at = self._now()
 
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         event = {
             "event": "round_start",
@@ -168,7 +170,7 @@ class GameEngine:
         if error:
             return ActionResult(success=False, game=game, error=error)
 
-        player = game.get_player(user_id)
+        player = self._player(game, user_id)
 
         if source == "discard":
             if not player.has_opened:
@@ -209,7 +211,7 @@ class GameEngine:
 
         game.updated_at = self._now()
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         event = {
             "event": "draw",
@@ -235,7 +237,7 @@ class GameEngine:
         if error:
             return ActionResult(success=False, game=game, error=error)
 
-        player = game.get_player(user_id)
+        player = self._player(game, user_id)
 
         if player.has_opened:
             return ActionResult(success=False, game=game, error="Hai già aperto")
@@ -262,6 +264,7 @@ class GameEngine:
         player.has_opened = True
         for game_cards in games:
             game_type = detect_game_type(game_cards)
+            assert game_type is not None
             tg = TableGame(
                 game_id=GameState.new_table_game_id(),
                 owner=user_id,
@@ -273,7 +276,7 @@ class GameEngine:
         game.turn_phase = PHASE_PLAY
         game.updated_at = self._now()
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         event = {
             "event": "open",
@@ -298,7 +301,7 @@ class GameEngine:
         if error:
             return ActionResult(success=False, game=game, error=error)
 
-        player = game.get_player(user_id)
+        player = self._player(game, user_id)
         if not player.has_opened:
             return ActionResult(
                 success=False, game=game, error="Devi prima aprire per calare giochi"
@@ -323,6 +326,7 @@ class GameEngine:
         # Apply
         player.hand = hand_copy
         game_type = detect_game_type(cards)
+        assert game_type is not None
         tg = TableGame(
             game_id=GameState.new_table_game_id(),
             owner=user_id,
@@ -333,7 +337,7 @@ class GameEngine:
 
         game.updated_at = self._now()
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         event = {
             "event": f"play_{game_type}",
@@ -356,7 +360,7 @@ class GameEngine:
         if error:
             return ActionResult(success=False, game=game, error=error)
 
-        player = game.get_player(user_id)
+        player = self._player(game, user_id)
         if not player.has_opened:
             return ActionResult(
                 success=False, game=game, error="Devi prima aprire per attaccare carte"
@@ -406,7 +410,7 @@ class GameEngine:
 
         game.updated_at = self._now()
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         event = {
             "event": "attach",
@@ -440,7 +444,7 @@ class GameEngine:
         if error:
             return ActionResult(success=False, game=game, error=error)
 
-        player = game.get_player(user_id)
+        player = self._player(game, user_id)
         if not player.has_opened:
             return ActionResult(
                 success=False,
@@ -489,7 +493,7 @@ class GameEngine:
 
         game.updated_at = self._now()
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         event = {
             "event": "substitute_joker",
@@ -512,7 +516,7 @@ class GameEngine:
         if error:
             return ActionResult(success=False, game=game, error=error)
 
-        player = game.get_player(user_id)
+        player = self._player(game, user_id)
 
         if card not in player.hand:
             return ActionResult(
@@ -572,7 +576,7 @@ class GameEngine:
 
         game.updated_at = self._now()
         self._repo.save_game(game)
-        game = self._repo.get_game(game_id)
+        game = self._reload(game_id)
 
         return ActionResult(success=True, game=game, events=events)
 
@@ -580,6 +584,19 @@ class GameEngine:
         return self._repo.get_game(game_id)
 
     # --- Private helpers ---
+
+    def _reload(self, game_id: str) -> GameState:
+        """Reload game from repo; asserts it exists."""
+        game = self._repo.get_game(game_id)
+        assert game is not None, f"Game {game_id} not found after save"
+        return game
+
+    @staticmethod
+    def _player(game: GameState, user_id: str) -> PlayerState:
+        """Get player; asserts they exist (call after _validate_turn)."""
+        p = game.get_player(user_id)
+        assert p is not None, f"Player {user_id} not in game"
+        return p
 
     def _validate_turn(
         self,

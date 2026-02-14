@@ -60,7 +60,8 @@ class DynamoDBLobbyRepository:
 
     def get_lobby(self, lobby_id: str) -> dict | None:
         response = self._table.get_item(Key={"lobbyId": lobby_id})
-        return response.get("Item")
+        item: dict | None = response.get("Item")
+        return item
 
     def save_lobby(self, lobby: dict) -> None:
         self._table.put_item(Item=lobby)
@@ -86,7 +87,8 @@ class DynamoDBUserRepository:
 
     def get_user(self, user_id: str) -> dict | None:
         response = self._table.get_item(Key={"userId": user_id})
-        return response.get("Item")
+        item: dict | None = response.get("Item")
+        return item
 
     def save_user(self, user: dict) -> None:
         self._table.put_item(Item=user)
