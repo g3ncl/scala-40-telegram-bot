@@ -7,14 +7,13 @@ from __future__ import annotations
 
 import argparse
 import random
-import sys
 import time
 
 from src.db.memory import InMemoryGameRepository
 from src.game.engine import GameEngine
 from src.game.integrity import validate_game_integrity
 from src.game.models import Card, GameState
-from src.game.validator import can_attach, is_valid_opening, validate_game
+from src.game.validator import can_attach, validate_game
 from src.utils.constants import (
     PHASE_DISCARD,
     PHASE_DRAW,
@@ -123,6 +122,7 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
         if player.has_opened and game.turn_phase == PHASE_PLAY:
             # Try to play additional games
             from itertools import combinations
+
             for size in [3, 4]:
                 if len(player.hand) <= size:
                     break
@@ -165,12 +165,10 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
         hand_shuffled = list(player.hand)
         rng.shuffle(hand_shuffled)
 
-        last_error = None
         for card in hand_shuffled:
             result = engine.process_discard(game.game_id, uid, card)
             if result.success:
                 return result.game
-            last_error = result.error
 
         # If no valid discard found (e.g., drawn from discard and all cards
         # attach or are the same card), try harder: the drawn_from_discard
@@ -188,14 +186,12 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
     return game
 
 
-def simulate_game(
-    num_players: int, rng: random.Random, verbose: bool = False
-) -> dict:
+def simulate_game(num_players: int, rng: random.Random, verbose: bool = False) -> dict:
     """Simulate one complete game. Returns stats dict."""
     repo = InMemoryGameRepository()
     engine = GameEngine(repo, rng)
 
-    player_ids = [f"p{i+1}" for i in range(num_players)]
+    player_ids = [f"p{i + 1}" for i in range(num_players)]
     game = engine.create_game(player_ids, lobby_id="sim")
     result = engine.start_round(game.game_id)
     game = result.game
@@ -256,7 +252,8 @@ def main() -> None:
     args = parser.parse_args()
 
     base_seed = args.seed if args.seed is not None else int(time.time())
-    print(f"Simulating {args.games} games with {args.players} players (base seed: {base_seed})")
+    n, p = args.games, args.players
+    print(f"Simulating {n} games with {p} players (base seed: {base_seed})")
 
     errors = 0
     wins: dict[str, int] = {}
@@ -270,7 +267,7 @@ def main() -> None:
         if result.get("error"):
             errors += 1
             if args.verbose:
-                print(f"  Game {i+1}: ERROR - {result['error']}")
+                print(f"  Game {i + 1}: ERROR - {result['error']}")
         else:
             winner = result.get("winner", "none")
             wins[winner] = wins.get(winner, 0) + 1
@@ -279,15 +276,15 @@ def main() -> None:
 
             if args.verbose:
                 print(
-                    f"  Game {i+1}: winner={winner}, "
+                    f"  Game {i + 1}: winner={winner}, "
                     f"turns={result['turns']}, smazzate={result['smazzate']}"
                 )
 
         if (i + 1) % 100 == 0 and not args.verbose:
-            print(f"  {i+1}/{args.games} completati...")
+            print(f"  {i + 1}/{args.games} completati...")
 
     completed = args.games - errors
-    print(f"\nRisultati:")
+    print("\nRisultati:")
     print(f"  Partite completate: {completed}/{args.games}")
     print(f"  Errori: {errors}")
     if completed > 0:

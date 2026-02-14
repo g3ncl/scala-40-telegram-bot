@@ -17,7 +17,12 @@ from src.game.integrity import validate_game_integrity
 from src.game.models import GameState
 
 
-def inspect_state(file_path: str, player: str | None, show: str | None, validate: bool) -> None:
+def inspect_state(
+    file_path: str,
+    player: str | None,
+    show: str | None,
+    validate: bool,
+) -> None:
     with open(file_path) as f:
         data = json.load(f)
 
@@ -51,7 +56,9 @@ def inspect_state(file_path: str, player: str | None, show: str | None, validate
             print("Giochi sul tavolo:")
             for tg in game.table_games:
                 cards_str = " ".join(c.display() for c in tg.cards)
-                print(f"  [{tg.game_id[:8]}] {tg.owner}: [{cards_str}] ({tg.game_type})")
+                print(
+                    f"  [{tg.game_id[:8]}] {tg.owner}: [{cards_str}] ({tg.game_type})"
+                )
         return
 
     # Default: full dump
@@ -64,9 +71,11 @@ def inspect_state(file_path: str, player: str | None, show: str | None, validate
     if game.discard_pile:
         print(f"  Top: {game.discard_pile[-1].display()}")
     print(f"Punteggi: {game.scores}")
-    print(f"Giocatori:")
+    print("Giocatori:")
     for p in game.players:
-        status = "ELIMINATO" if p.is_eliminated else ("aperto" if p.has_opened else "chiuso")
+        status = (
+            "ELIMINATO" if p.is_eliminated else ("aperto" if p.has_opened else "chiuso")
+        )
         print(f"  {p.user_id}: {len(p.hand)} carte ({status})")
 
 

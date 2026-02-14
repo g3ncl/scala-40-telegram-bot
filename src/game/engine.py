@@ -6,7 +6,7 @@ import json
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.db.repository import GameRepository
 from src.game.deck import (
@@ -56,9 +56,7 @@ class ActionResult:
 class GameEngine:
     """Stateless game engine. All state lives in GameState / repository."""
 
-    def __init__(
-        self, repo: GameRepository, rng: random.Random | None = None
-    ) -> None:
+    def __init__(self, repo: GameRepository, rng: random.Random | None = None) -> None:
         self._repo = repo
         self._rng = rng or create_rng()
 
@@ -157,9 +155,7 @@ class GameEngine:
         logger.info(json.dumps(event))
         return ActionResult(success=True, game=game, events=[event])
 
-    def process_draw(
-        self, game_id: str, user_id: str, source: str
-    ) -> ActionResult:
+    def process_draw(self, game_id: str, user_id: str, source: str) -> ActionResult:
         """Draw a card from deck or discard pile.
 
         source: "deck" or "discard"
@@ -177,13 +173,12 @@ class GameEngine:
         if source == "discard":
             if not player.has_opened:
                 return ActionResult(
-                    success=False, game=game,
-                    error="Devi aver aperto per pescare dal pozzo"
+                    success=False,
+                    game=game,
+                    error="Devi aver aperto per pescare dal pozzo",
                 )
             if not game.discard_pile:
-                return ActionResult(
-                    success=False, game=game, error="Il pozzo è vuoto"
-                )
+                return ActionResult(success=False, game=game, error="Il pozzo è vuoto")
             card, game.discard_pile = draw_from_discard(game.discard_pile)
             game.drawn_from_discard = card
         elif source == "deck":
@@ -191,8 +186,7 @@ class GameEngine:
                 # Reshuffle discard pile
                 if len(game.discard_pile) < 2:
                     return ActionResult(
-                        success=False, game=game,
-                        error="Non ci sono carte da pescare"
+                        success=False, game=game, error="Non ci sono carte da pescare"
                     )
                 game.deck, last_discard = reshuffle_discard(
                     game.discard_pile, self._rng
@@ -202,8 +196,7 @@ class GameEngine:
             game.drawn_from_discard = None
         else:
             return ActionResult(
-                success=False, game=game,
-                error=f"Sorgente non valida: {source}"
+                success=False, game=game, error=f"Sorgente non valida: {source}"
             )
 
         player.hand.append(card)
@@ -245,9 +238,7 @@ class GameEngine:
         player = game.get_player(user_id)
 
         if player.has_opened:
-            return ActionResult(
-                success=False, game=game, error="Hai già aperto"
-            )
+            return ActionResult(success=False, game=game, error="Hai già aperto")
 
         # Validate opening
         result = is_valid_opening(games)
@@ -260,8 +251,9 @@ class GameEngine:
         for card in all_cards:
             if card not in hand_copy:
                 return ActionResult(
-                    success=False, game=game,
-                    error=f"Carta {card.display()} non in mano"
+                    success=False,
+                    game=game,
+                    error=f"Carta {card.display()} non in mano",
                 )
             hand_copy.remove(card)
 
@@ -309,8 +301,7 @@ class GameEngine:
         player = game.get_player(user_id)
         if not player.has_opened:
             return ActionResult(
-                success=False, game=game,
-                error="Devi prima aprire per calare giochi"
+                success=False, game=game, error="Devi prima aprire per calare giochi"
             )
 
         # Validate the game
@@ -323,8 +314,9 @@ class GameEngine:
         for card in cards:
             if card not in hand_copy:
                 return ActionResult(
-                    success=False, game=game,
-                    error=f"Carta {card.display()} non in mano"
+                    success=False,
+                    game=game,
+                    error=f"Carta {card.display()} non in mano",
                 )
             hand_copy.remove(card)
 
@@ -367,8 +359,7 @@ class GameEngine:
         player = game.get_player(user_id)
         if not player.has_opened:
             return ActionResult(
-                success=False, game=game,
-                error="Devi prima aprire per attaccare carte"
+                success=False, game=game, error="Devi prima aprire per attaccare carte"
             )
 
         # Find table game
@@ -385,8 +376,7 @@ class GameEngine:
         # Check card in hand
         if card not in player.hand:
             return ActionResult(
-                success=False, game=game,
-                error=f"Carta {card.display()} non in mano"
+                success=False, game=game, error=f"Carta {card.display()} non in mano"
             )
 
         # Validate attachment
@@ -429,8 +419,12 @@ class GameEngine:
         return ActionResult(success=True, game=game, events=[event])
 
     def process_substitute_joker(
-        self, game_id: str, user_id: str, card: Card,
-        table_game_id: str, joker_play: dict
+        self,
+        game_id: str,
+        user_id: str,
+        card: Card,
+        table_game_id: str,
+        joker_play: dict,
     ) -> ActionResult:
         """Substitute a joker on the table and immediately use it.
 
@@ -449,8 +443,9 @@ class GameEngine:
         player = game.get_player(user_id)
         if not player.has_opened:
             return ActionResult(
-                success=False, game=game,
-                error="Devi aver aperto per sostituire un jolly"
+                success=False,
+                game=game,
+                error="Devi aver aperto per sostituire un jolly",
             )
 
         # Find table game
@@ -460,9 +455,7 @@ class GameEngine:
                 target = tg
                 break
         if target is None:
-            return ActionResult(
-                success=False, game=game, error="Gioco non trovato"
-            )
+            return ActionResult(success=False, game=game, error="Gioco non trovato")
 
         # Validate substitution
         result = can_substitute_joker(card, target)
@@ -471,8 +464,7 @@ class GameEngine:
 
         if card not in player.hand:
             return ActionResult(
-                success=False, game=game,
-                error=f"Carta {card.display()} non in mano"
+                success=False, game=game, error=f"Carta {card.display()} non in mano"
             )
 
         # Remove card from hand, swap in table game
@@ -509,18 +501,14 @@ class GameEngine:
         logger.info(json.dumps(event))
         return ActionResult(success=True, game=game, events=[event])
 
-    def process_discard(
-        self, game_id: str, user_id: str, card: Card
-    ) -> ActionResult:
+    def process_discard(self, game_id: str, user_id: str, card: Card) -> ActionResult:
         """Discard a card, ending the turn. May trigger closure."""
         game = self._repo.get_game(game_id)
         if game is None:
             return ActionResult(success=False, game=None, error="Partita non trovata")
 
         # Allow discard from both PLAY and DISCARD phases
-        error = self._validate_turn(
-            game, user_id, PHASE_PLAY, allow_discard_phase=True
-        )
+        error = self._validate_turn(game, user_id, PHASE_PLAY, allow_discard_phase=True)
         if error:
             return ActionResult(success=False, game=game, error=error)
 
@@ -528,8 +516,7 @@ class GameEngine:
 
         if card not in player.hand:
             return ActionResult(
-                success=False, game=game,
-                error=f"Carta {card.display()} non in mano"
+                success=False, game=game, error=f"Carta {card.display()} non in mano"
             )
 
         cards_in_hand_after = len(player.hand) - 1
@@ -552,13 +539,13 @@ class GameEngine:
         if is_closing:
             if not player.has_opened:
                 return ActionResult(
-                    success=False, game=game,
-                    error="Non puoi chiudere senza aver aperto"
+                    success=False,
+                    game=game,
+                    error="Non puoi chiudere senza aver aperto",
                 )
             if not game.first_round_complete:
                 return ActionResult(
-                    success=False, game=game,
-                    error="Non puoi chiudere al primo giro"
+                    success=False, game=game, error="Non puoi chiudere al primo giro"
                 )
 
         # Apply discard
@@ -595,10 +582,13 @@ class GameEngine:
     # --- Private helpers ---
 
     def _validate_turn(
-        self, game: GameState, user_id: str, expected_phase: str,
+        self,
+        game: GameState,
+        user_id: str,
+        expected_phase: str,
         allow_discard_phase: bool = False,
     ) -> str | None:
-        """Validate that it's the user's turn and correct phase. Returns error or None."""
+        """Validate user's turn and correct phase. Returns error or None."""
         if game.status != STATUS_PLAYING:
             return "La partita non è in corso"
 
@@ -612,7 +602,9 @@ class GameEngine:
         if game.turn_phase != expected_phase:
             if allow_discard_phase and game.turn_phase == PHASE_DISCARD:
                 return None
-            return f"Fase non corretta: attesa {expected_phase}, attuale {game.turn_phase}"
+            return (
+                f"Fase non corretta: attesa {expected_phase}, attuale {game.turn_phase}"
+            )
 
         return None
 
@@ -680,4 +672,4 @@ class GameEngine:
 
     @staticmethod
     def _now() -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()

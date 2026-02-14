@@ -4,14 +4,8 @@ from src.db.memory import InMemoryGameRepository
 from src.game.engine import GameEngine
 from src.game.integrity import validate_game_integrity
 from src.game.models import Card
-from src.game.validator import can_attach, validate_game
 from src.utils.constants import (
-    PHASE_DISCARD,
     PHASE_DRAW,
-    PHASE_PLAY,
-    STATUS_FINISHED,
-    STATUS_PLAYING,
-    STATUS_ROUND_END,
 )
 from src.utils.crypto import create_rng
 
@@ -72,10 +66,19 @@ class TestFullRound:
         # Use deck-1 cards for the forced hand to avoid conflicts with
         # the dealt deck-0 cards already distributed to hands/deck/discard.
         forced_hand = [
-            c("Kh1"), c("Kd1"), c("Kc1"),     # tris K = 30
-            c("5h1"), c("5d1"), c("5c1"),      # tris 5 = 15 -> total 45
-            c("3h1"), c("4h1"), c("5s1"),
-            c("8s1"), c("9s1"), c("Js1"), c("Qs1"),
+            c("Kh1"),
+            c("Kd1"),
+            c("Kc1"),  # tris K = 30
+            c("5h1"),
+            c("5d1"),
+            c("5c1"),  # tris 5 = 15 -> total 45
+            c("3h1"),
+            c("4h1"),
+            c("5s1"),
+            c("8s1"),
+            c("9s1"),
+            c("Js1"),
+            c("Qs1"),
         ]
 
         # Collect all cards NOT in current player's hand into a mutable pool,
@@ -86,10 +89,7 @@ class TestFullRound:
         all_pools = [
             ("deck", game.deck),
             ("discard", game.discard_pile),
-        ] + [
-            (f"hand_{p.user_id}", p.hand)
-            for p in game.players if p.user_id != uid
-        ]
+        ] + [(f"hand_{p.user_id}", p.hand) for p in game.players if p.user_id != uid]
 
         for card in forced_hand:
             # Skip if already in the current player's hand
@@ -117,8 +117,9 @@ class TestFullRound:
 
         # Open
         result = eng.process_open(
-            game.game_id, uid,
-            [[c("Kh1"), c("Kd1"), c("Kc1")], [c("5h1"), c("5d1"), c("5c1")]]
+            game.game_id,
+            uid,
+            [[c("Kh1"), c("Kd1"), c("Kc1")], [c("5h1"), c("5d1"), c("5c1")]],
         )
         assert result.success
         game = result.game

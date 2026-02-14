@@ -44,9 +44,7 @@ def validate_game_integrity(game: GameState) -> list[str]:
         all_cards.extend(tg.cards)
 
     if len(all_cards) != TOTAL_CARDS:
-        errors.append(
-            f"Totale carte = {len(all_cards)}, atteso {TOTAL_CARDS}"
-        )
+        errors.append(f"Totale carte = {len(all_cards)}, atteso {TOTAL_CARDS}")
 
     # 2. Check card duplicates
     # Each non-joker card (suit, rank, deck) should appear exactly once.
@@ -58,7 +56,8 @@ def validate_game_integrity(game: GameState) -> list[str]:
     for key, count in non_joker_counts.items():
         if count > 1:
             errors.append(
-                f"Carta duplicata illegale: suit={key[0]} rank={key[1]} deck={key[2]} (x{count})"
+                f"Carta duplicata illegale: "
+                f"suit={key[0]} rank={key[1]} deck={key[2]} (x{count})"
             )
 
     joker_count = sum(1 for c in all_cards if c.is_joker)
@@ -69,16 +68,12 @@ def validate_game_integrity(game: GameState) -> list[str]:
     for tg in game.table_games:
         result = validate_game(tg.cards)
         if not result.valid:
-            errors.append(
-                f"Gioco sul tavolo {tg.game_id} non valido: {result.error}"
-            )
+            errors.append(f"Gioco sul tavolo {tg.game_id} non valido: {result.error}")
 
     # 4. Current turn player
     active_ids = {p.user_id for p in game.get_active_players()}
     if game.current_turn_user_id not in active_ids:
-        errors.append(
-            f"Giocatore di turno {game.current_turn_user_id} non è attivo"
-        )
+        errors.append(f"Giocatore di turno {game.current_turn_user_id} non è attivo")
 
     # 5. Turn phase
     if game.turn_phase not in (PHASE_DRAW, PHASE_PLAY, PHASE_DISCARD):
@@ -88,9 +83,7 @@ def validate_game_integrity(game: GameState) -> list[str]:
     for tg in game.table_games:
         owner = game.get_player(tg.owner)
         if owner and not owner.has_opened and not owner.is_eliminated:
-            errors.append(
-                f"Giocatore {tg.owner} ha giochi sul tavolo ma non ha aperto"
-            )
+            errors.append(f"Giocatore {tg.owner} ha giochi sul tavolo ma non ha aperto")
 
     # 7. Non-negative scores
     for uid, score in game.scores.items():

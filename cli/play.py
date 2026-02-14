@@ -6,13 +6,11 @@ Usage: python -m cli.play --players 2 [--seed 42]
 from __future__ import annotations
 
 import argparse
-import sys
 
 from src.db.memory import InMemoryGameRepository
 from src.game.engine import GameEngine
 from src.game.integrity import validate_game_integrity
 from src.game.models import Card, GameState
-from src.game.validator import can_attach
 from src.utils.constants import (
     PHASE_DISCARD,
     PHASE_DRAW,
@@ -43,9 +41,9 @@ def display_table(game: GameState) -> str:
     """Format table state for terminal display."""
     lines = [
         "",
-        f"{'='*50}",
+        f"{'=' * 50}",
         f"  SCALA 40 — Smazzata #{game.smazzata_number}",
-        f"{'='*50}",
+        f"{'=' * 50}",
         "",
         f"  Turno di: {game.current_turn_user_id} (fase: {game.turn_phase})",
     ]
@@ -63,7 +61,9 @@ def display_table(game: GameState) -> str:
         lines.append("  Giochi sul tavolo:")
         for tg in game.table_games:
             cards_str = " ".join(c.display() for c in tg.cards)
-            lines.append(f"    [{tg.game_id[:6]}] {tg.owner}: [{cards_str}] ({tg.game_type})")
+            lines.append(
+                f"    [{tg.game_id[:6]}] {tg.owner}: [{cards_str}] ({tg.game_type})"
+            )
         lines.append("")
 
     lines.append("  Carte in mano:")
@@ -76,14 +76,10 @@ def display_table(game: GameState) -> str:
                 status = " ← turno"
             if not player.has_opened:
                 status += " (non ha aperto)"
-            lines.append(
-                f"    {player.user_id}: {len(player.hand)} carte{status}"
-            )
+            lines.append(f"    {player.user_id}: {len(player.hand)} carte{status}")
 
     lines.append("")
-    scores = " | ".join(
-        f"{uid}: {score}" for uid, score in game.scores.items()
-    )
+    scores = " | ".join(f"{uid}: {score}" for uid, score in game.scores.items())
     lines.append(f"  Punteggi: {scores}")
     lines.append("")
 
@@ -102,10 +98,14 @@ def display_actions(game: GameState, user_id: str) -> str:
             lines.append(f"    pickup     - Prendi dal pozzo ({top})")
     elif game.turn_phase in (PHASE_PLAY, PHASE_DISCARD):
         if not player.has_opened and game.turn_phase == PHASE_DISCARD:
-            lines.append("    open <carte> | <carte> - Apri (es: open Kh Kd Kc | 5h 5d 5c)")
+            lines.append(
+                "    open <carte> | <carte> - Apri (es: open Kh Kd Kc | 5h 5d 5c)"
+            )
         if player.has_opened:
             lines.append("    play <carte>   - Cala un gioco (es: play 3h 4h 5h)")
-            lines.append("    attach <carta> <id> - Attacca a gioco (es: attach 6h abc123)")
+            lines.append(
+                "    attach <carta> <id> - Attacca a gioco (es: attach 6h abc123)"
+            )
         lines.append("    discard <carta> - Scarta (es: discard 8h)")
 
     lines.append("    hand       - Mostra la mano")
@@ -121,7 +121,7 @@ def play_game(num_players: int, seed: int | None = None) -> None:
     repo = InMemoryGameRepository()
     engine = GameEngine(repo, rng)
 
-    player_ids = [f"player{i+1}" for i in range(num_players)]
+    player_ids = [f"player{i + 1}" for i in range(num_players)]
     game = engine.create_game(player_ids, lobby_id="local")
     result = engine.start_round(game.game_id)
     if not result.success:
@@ -201,8 +201,7 @@ def play_game(num_players: int, seed: int | None = None) -> None:
                 tg_id = parts[2]
                 # Find matching table game ID
                 matching = [
-                    tg for tg in game.table_games
-                    if tg.game_id.startswith(tg_id)
+                    tg for tg in game.table_games if tg.game_id.startswith(tg_id)
                 ]
                 if not matching:
                     print(f"  Gioco '{tg_id}' non trovato")
@@ -235,7 +234,9 @@ def play_game(num_players: int, seed: int | None = None) -> None:
                     print(f"\n  *** {event['user_id']} ha chiuso! ***")
                     print(f"  Punteggi: {event['scores']}")
                 elif ev_type == "elimination":
-                    print(f"  *** {event['user_id']} è eliminato! (score: {event['total_score']})")
+                    uid = event["user_id"]
+                    sc = event["total_score"]
+                    print(f"  *** {uid} è eliminato! (score: {sc})")
                 elif ev_type == "game_end":
                     print(f"\n  *** {event['winner']} ha vinto la partita! ***")
                     print(f"  Punteggi finali: {event['final_scores']}")

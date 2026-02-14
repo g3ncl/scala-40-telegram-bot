@@ -9,7 +9,6 @@ from botocore.exceptions import ClientError
 
 from src.game.models import GameState
 
-
 # Initialize DynamoDB resource at module level for Lambda warm starts
 _dynamodb = None
 _prefix = os.environ.get("DYNAMODB_TABLE_PREFIX", "Scala40")
@@ -42,9 +41,7 @@ class DynamoDBGameRepository:
         try:
             self._table.put_item(
                 Item=item,
-                ConditionExpression=(
-                    "attribute_not_exists(gameId) OR version = :v"
-                ),
+                ConditionExpression=("attribute_not_exists(gameId) OR version = :v"),
                 ExpressionAttributeValues={":v": game.version},
             )
         except ClientError as e:

@@ -70,7 +70,9 @@ def is_valid_sequence(cards: list[Card]) -> ValidationResult:
         return ValidationResult(False, error="La sequenza richiede almeno 3 carte")
 
     if len(cards) > 14:
-        return ValidationResult(False, error="La sequenza non può avere più di 14 carte")
+        return ValidationResult(
+            False, error="La sequenza non può avere più di 14 carte"
+        )
 
     jokers = [c for c in cards if c.is_joker]
     regulars = [c for c in cards if not c.is_joker]
@@ -79,12 +81,16 @@ def is_valid_sequence(cards: list[Card]) -> ValidationResult:
         return ValidationResult(False, error="Massimo 1 jolly per sequenza")
 
     if not regulars:
-        return ValidationResult(False, error="La sequenza non può essere composta solo da jolly")
+        return ValidationResult(
+            False, error="La sequenza non può essere composta solo da jolly"
+        )
 
     # All regular cards must be same suit
     suit = regulars[0].suit
     if not all(c.suit == suit for c in regulars):
-        return ValidationResult(False, error="Tutte le carte devono essere dello stesso seme")
+        return ValidationResult(
+            False, error="Tutte le carte devono essere dello stesso seme"
+        )
 
     ranks = sorted(c.rank for c in regulars)
 
@@ -167,9 +173,7 @@ def is_valid_combination(cards: list[Card]) -> ValidationResult:
     - No two cards of the same suit
     """
     if len(cards) < 3 or len(cards) > 4:
-        return ValidationResult(
-            False, error="La combinazione richiede 3 o 4 carte"
-        )
+        return ValidationResult(False, error="La combinazione richiede 3 o 4 carte")
 
     jokers = [c for c in cards if c.is_joker]
     regulars = [c for c in cards if not c.is_joker]
@@ -197,9 +201,7 @@ def is_valid_combination(cards: list[Card]) -> ValidationResult:
     # All different suits
     suits = [c.suit for c in regulars]
     if len(suits) != len(set(suits)):
-        return ValidationResult(
-            False, error="Tutte le carte devono avere semi diversi"
-        )
+        return ValidationResult(False, error="Tutte le carte devono avere semi diversi")
 
     # Calculate points
     points = sum(card_points(c) for c in regulars)
@@ -220,7 +222,10 @@ def validate_game(cards: list[Card]) -> ValidationResult:
         return comb_result
     return ValidationResult(
         False,
-        error=f"Gioco non valido. Sequenza: {seq_result.error}. Combinazione: {comb_result.error}",
+        error=(
+            f"Gioco non valido. Sequenza: {seq_result.error}. "
+            f"Combinazione: {comb_result.error}"
+        ),
     )
 
 
@@ -253,7 +258,10 @@ def is_valid_opening(games: list[list[Card]]) -> ValidationResult:
     if total_points < OPENING_THRESHOLD:
         return ValidationResult(
             False,
-            error=f"Apertura insufficiente: {total_points} punti (minimo {OPENING_THRESHOLD})",
+            error=(
+                f"Apertura insufficiente: {total_points} punti "
+                f"(minimo {OPENING_THRESHOLD})"
+            ),
         )
 
     return ValidationResult(True, points=total_points)
@@ -337,7 +345,7 @@ def _get_sequence_ranks(cards: list[Card]) -> list[int] | None:
     ranks = sorted(c.rank for c in regulars)
 
     # Try ace-low and ace-high
-    for ace_val in ([1] if ACE not in ranks else [1, 14]):
+    for ace_val in [1] if ACE not in ranks else [1, 14]:
         try_ranks = sorted([ace_val if r == ACE else r for r in ranks])
 
         # Build full sequence filling joker gaps
@@ -366,9 +374,7 @@ def _get_sequence_ranks(cards: list[Card]) -> list[int] | None:
     return None
 
 
-def _can_attach_to_combination(
-    card: Card, table_game: TableGame
-) -> ValidationResult:
+def _can_attach_to_combination(card: Card, table_game: TableGame) -> ValidationResult:
     """Check if a card can be added to a combination."""
     if len(table_game.cards) >= 4:
         return ValidationResult(False, error="La combinazione ha già 4 carte")
@@ -385,9 +391,7 @@ def _can_attach_to_combination(
 
     rank = regulars[0].rank
     if card.rank != rank:
-        return ValidationResult(
-            False, error="La carta deve avere lo stesso valore"
-        )
+        return ValidationResult(False, error="La carta deve avere lo stesso valore")
 
     # Check suit not already present
     existing_suits = {c.suit for c in regulars}
@@ -397,9 +401,7 @@ def _can_attach_to_combination(
     return ValidationResult(True, points=card_points(card))
 
 
-def can_substitute_joker(
-    card: Card, table_game: TableGame
-) -> ValidationResult:
+def can_substitute_joker(card: Card, table_game: TableGame) -> ValidationResult:
     """Check if a card can replace a joker in a table game.
 
     The card must be the exact card the joker is substituting.
@@ -409,7 +411,9 @@ def can_substitute_joker(
         return ValidationResult(False, error="Nessun jolly in questo gioco")
 
     if card.is_joker:
-        return ValidationResult(False, error="Non puoi sostituire un jolly con un jolly")
+        return ValidationResult(
+            False, error="Non puoi sostituire un jolly con un jolly"
+        )
 
     if table_game.game_type == GAME_TYPE_COMBINATION:
         regulars = [c for c in table_game.cards if not c.is_joker]
@@ -434,15 +438,13 @@ def can_substitute_joker(
             return ValidationResult(False, error="Sequenza non valida")
 
         # Find the joker's position rank
-        joker_idx = joker_indices[0]
+        joker_indices[0]
         # The joker fills a specific rank in the sequence
         # We need to determine what rank the joker represents
         sorted_with_pos = []
-        joker_rank_in_seq = None
-        rank_idx = 0
         for i, c in enumerate(table_game.cards):
             if c.is_joker:
-                joker_rank_in_seq = seq_ranks[i] if i < len(seq_ranks) else None
+                seq_ranks[i] if i < len(seq_ranks) else None
             sorted_with_pos.append((i, c))
 
         # Simpler approach: the joker represents the missing rank
@@ -496,7 +498,8 @@ def is_valid_discard(
             if result.valid:
                 return ValidationResult(
                     False,
-                    error="Non puoi scartare una carta che si attacca a un gioco sul tavolo",
+                    error="Non puoi scartare una carta che "
+                    "si attacca a un gioco sul tavolo",
                 )
 
     return ValidationResult(True)

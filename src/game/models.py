@@ -14,11 +14,7 @@ from src.utils.constants import (
     JOKER_POINTS,
     JOKER_RANK,
     JOKER_SUIT,
-    KING,
-    PHASE_DRAW,
-    QUEEN,
     RANK_NAMES,
-    STATUS_PLAYING,
     SUIT_SYMBOLS,
 )
 
@@ -211,7 +207,9 @@ class GameState:
             "status": self.status,
             "settings": self.settings,
             "updatedAt": self.updated_at,
-            "drawnFromDiscard": self.drawn_from_discard.to_dict() if self.drawn_from_discard else None,
+            "drawnFromDiscard": self.drawn_from_discard.to_dict()
+            if self.drawn_from_discard
+            else None,
             "version": self.version,
             "roundStarterUserId": self.round_starter_user_id,
         }

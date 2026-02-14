@@ -1,7 +1,6 @@
 """Tests for lobby manager."""
 
 import pytest
-
 from src.db.memory import (
     InMemoryGameRepository,
     InMemoryLobbyRepository,

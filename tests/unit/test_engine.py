@@ -1,13 +1,11 @@
 """Tests for the game engine."""
 
 import pytest
-
 from src.db.memory import InMemoryGameRepository
 from src.game.engine import GameEngine
-from src.game.models import Card, GameState, PlayerState, TableGame
+from src.game.models import Card
 from src.utils.constants import (
     GAME_TYPE_COMBINATION,
-    GAME_TYPE_SEQUENCE,
     PHASE_DISCARD,
     PHASE_DRAW,
     PHASE_PLAY,
@@ -50,9 +48,7 @@ class TestCreateGame:
         assert game.scores == {"p1": 0, "p2": 0, "p3": 0}
 
     def test_settings(self, engine):
-        game = engine.create_game(
-            ["p1", "p2"], settings={"elimination_score": 201}
-        )
+        game = engine.create_game(["p1", "p2"], settings={"elimination_score": 201})
         assert game.settings["elimination_score"] == 201
 
 
@@ -133,10 +129,19 @@ class TestProcessOpen:
         player = game.get_player(game.current_turn_user_id)
         # Replace hand with cards that allow opening >= 40
         player.hand = [
-            c("Kh"), c("Kd"), c("Kc"),     # tris K = 30
-            c("5h"), c("5d"), c("5c"),       # tris 5 = 15 -> total 45
-            c("2h"), c("3h"), c("4h"),       # sequence = 9
-            c("8s"), c("9s"), c("Js"), c("Qs"),  # extras
+            c("Kh"),
+            c("Kd"),
+            c("Kc"),  # tris K = 30
+            c("5h"),
+            c("5d"),
+            c("5c"),  # tris 5 = 15 -> total 45
+            c("2h"),
+            c("3h"),
+            c("4h"),  # sequence = 9
+            c("8s"),
+            c("9s"),
+            c("Js"),
+            c("Qs"),  # extras
         ]
         # Need to draw first
         engine._repo.save_game(game)
@@ -175,27 +180,35 @@ class TestProcessPlay:
         uid = game.current_turn_user_id
         player = game.get_player(uid)
         player.hand = [
-            c("Kh"), c("Kd"), c("Kc"),
-            c("5h"), c("5d"), c("5c"),
-            c("2h"), c("3h"), c("4h"),
-            c("8s"), c("9s"), c("Js"), c("Qs"),
+            c("Kh"),
+            c("Kd"),
+            c("Kc"),
+            c("5h"),
+            c("5d"),
+            c("5c"),
+            c("2h"),
+            c("3h"),
+            c("4h"),
+            c("8s"),
+            c("9s"),
+            c("Js"),
+            c("Qs"),
         ]
         engine._repo.save_game(game)
 
         engine.process_draw(game.game_id, uid, "deck")
         game = engine.get_game(game.game_id)
         engine.process_open(
-            game.game_id, uid,
-            [[c("Kh"), c("Kd"), c("Kc")], [c("5h"), c("5d"), c("5c")]]
+            game.game_id,
+            uid,
+            [[c("Kh"), c("Kd"), c("Kc")], [c("5h"), c("5d"), c("5c")]],
         )
         return engine.get_game(game.game_id)
 
     def test_play_sequence(self, engine, game_with_round):
         game = self._setup_opened_player(engine, game_with_round)
         uid = game.current_turn_user_id
-        result = engine.process_play(
-            game.game_id, uid, [c("2h"), c("3h"), c("4h")]
-        )
+        result = engine.process_play(game.game_id, uid, [c("2h"), c("3h"), c("4h")])
         assert result.success
         # Now 3 table games (2 from opening + 1 new)
         assert len(result.game.table_games) == 3
@@ -206,9 +219,7 @@ class TestProcessPlay:
         # Draw first to get to play/discard phase
         engine.process_draw(game.game_id, uid, "deck")
         game = engine.get_game(game.game_id)
-        result = engine.process_play(
-            game.game_id, uid, [c("2h"), c("3h"), c("4h")]
-        )
+        result = engine.process_play(game.game_id, uid, [c("2h"), c("3h"), c("4h")])
         assert not result.success
 
 
@@ -219,17 +230,27 @@ class TestProcessAttach:
         player = game.get_player(uid)
         # Set up: player has opened, has a sequence on table, and 6h in hand
         player.hand = [
-            c("Kh"), c("Kd"), c("Kc"),
-            c("5h"), c("5d"), c("5c"),
-            c("3h"), c("4h"), c("5s"),  # 5s stays, 3h,4h for sequence
-            c("6h"), c("9s"), c("Js"), c("Qs"),  # 6h to attach
+            c("Kh"),
+            c("Kd"),
+            c("Kc"),
+            c("5h"),
+            c("5d"),
+            c("5c"),
+            c("3h"),
+            c("4h"),
+            c("5s"),  # 5s stays, 3h,4h for sequence
+            c("6h"),
+            c("9s"),
+            c("Js"),
+            c("Qs"),  # 6h to attach
         ]
         engine._repo.save_game(game)
         engine.process_draw(game.game_id, uid, "deck")
         game = engine.get_game(game.game_id)
         engine.process_open(
-            game.game_id, uid,
-            [[c("Kh"), c("Kd"), c("Kc")], [c("5h"), c("5d"), c("5c")]]
+            game.game_id,
+            uid,
+            [[c("Kh"), c("Kd"), c("Kc")], [c("5h"), c("5d"), c("5c")]],
         )
         game = engine.get_game(game.game_id)
         # Play a sequence 3h, 4h, 5s — wait, that's invalid (different suits)
@@ -254,9 +275,7 @@ class TestProcessAttach:
         player2.hand.append(c("Ks"))
         engine._repo.save_game(game)
 
-        result = engine.process_attach(
-            game.game_id, uid, c("Ks"), king_tris.game_id
-        )
+        result = engine.process_attach(game.game_id, uid, c("Ks"), king_tris.game_id)
         assert result.success
 
 
@@ -285,7 +304,9 @@ class TestProcessDiscard:
         engine.process_draw(game.game_id, first, "deck")
         # Try discarding a card not in hand
         result = engine.process_discard(
-            game.game_id, first, c("J0")  # Joker unlikely in hand
+            game.game_id,
+            first,
+            c("J0"),  # Joker unlikely in hand
         )
         # Might succeed if joker happens to be in hand, so check
         game = engine.get_game(game.game_id)
@@ -389,9 +410,7 @@ class TestTurnAdvancement:
         engine.process_draw(game.game_id, first, "deck")
         game = engine.get_game(game.game_id)
         player = game.get_player(first)
-        result = engine.process_discard(
-            game.game_id, first, player.hand[-1]
-        )
+        result = engine.process_discard(game.game_id, first, player.hand[-1])
         assert result.game.current_turn_user_id == second
 
     def test_skips_eliminated_player(self, engine):

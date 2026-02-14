@@ -31,7 +31,9 @@ def lambda_handler(event: dict, context) -> dict:
     except json.JSONDecodeError:
         return {"statusCode": 400, "body": "Invalid JSON"}
 
-    logger.info(json.dumps({"event": "webhook_received", "update_id": body.get("update_id")}))
+    logger.info(
+        json.dumps({"event": "webhook_received", "update_id": body.get("update_id")})
+    )
 
     # TODO: Route to bot/commands.py and bot/callbacks.py
     # This will be implemented in Phase 2 when we add Telegram integration.

@@ -1,7 +1,6 @@
 """Shared test fixtures for Scala 40."""
 
 import pytest
-
 from src.db.memory import (
     InMemoryGameRepository,
     InMemoryLobbyRepository,

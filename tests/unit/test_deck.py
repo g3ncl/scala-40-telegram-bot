@@ -1,10 +1,8 @@
 """Tests for deck operations."""
 
-import random
 from collections import Counter
 
 import pytest
-
 from src.game.deck import (
     create_deck,
     deal,
@@ -14,7 +12,7 @@ from src.game.deck import (
     shuffle_cards,
 )
 from src.game.models import Card
-from src.utils.constants import JOKER_SUIT, TOTAL_CARDS
+from src.utils.constants import TOTAL_CARDS
 from src.utils.crypto import create_rng
 
 
@@ -49,7 +47,10 @@ class TestShuffle:
         deck = create_deck()
         shuffled = shuffle_cards(deck, rng)
         assert len(shuffled) == len(deck)
-        assert Counter(id(c) for c in deck) != Counter(id(c) for c in shuffled) or deck != shuffled
+        assert (
+            Counter(id(c) for c in deck) != Counter(id(c) for c in shuffled)
+            or deck != shuffled
+        )
         # Same cards (as multiset)
         assert sorted(deck, key=lambda c: (c.suit, c.rank, c.deck)) == sorted(
             shuffled, key=lambda c: (c.suit, c.rank, c.deck)

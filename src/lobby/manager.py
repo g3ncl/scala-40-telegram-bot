@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from src.db.repository import GameRepository, LobbyRepository, UserRepository
+from src.db.repository import LobbyRepository, UserRepository
 from src.game.engine import GameEngine
 from src.utils.constants import (
     DEFAULT_ELIMINATION_SCORE,
@@ -47,17 +47,16 @@ class LobbyManager:
         """Create a new lobby. Host is auto-joined."""
         code = generate_lobby_code()
         lobby_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         lobby = {
             "lobbyId": lobby_id,
             "code": code,
             "hostUserId": host_user_id,
-            "players": [
-                {"userId": host_user_id, "ready": False}
-            ],
+            "players": [{"userId": host_user_id, "ready": False}],
             "status": STATUS_WAITING,
-            "settings": settings or {
+            "settings": settings
+            or {
                 "elimination_score": DEFAULT_ELIMINATION_SCORE,
                 "variants": [],
             },
@@ -101,9 +100,7 @@ class LobbyManager:
             self._lobby_repo.save_lobby(lobby)
             return LobbyResult(success=True, lobby=lobby)
 
-        lobby["players"] = [
-            p for p in lobby["players"] if p["userId"] != user_id
-        ]
+        lobby["players"] = [p for p in lobby["players"] if p["userId"] != user_id]
         self._lobby_repo.save_lobby(lobby)
         return LobbyResult(success=True, lobby=lobby)
 
@@ -141,9 +138,7 @@ class LobbyManager:
             )
 
         if not all(p["ready"] for p in lobby["players"]):
-            return LobbyResult(
-                success=False, error="Non tutti i giocatori sono pronti"
-            )
+            return LobbyResult(success=False, error="Non tutti i giocatori sono pronti")
 
         # Create game
         player_ids = [p["userId"] for p in lobby["players"]]
@@ -161,9 +156,7 @@ class LobbyManager:
         lobby["status"] = STATUS_IN_GAME
         self._lobby_repo.save_lobby(lobby)
 
-        return LobbyResult(
-            success=True, lobby=lobby, game_id=game.game_id
-        )
+        return LobbyResult(success=True, lobby=lobby, game_id=game.game_id)
 
     def get_lobby(self, lobby_id: str) -> dict | None:
         return self._lobby_repo.get_lobby(lobby_id)

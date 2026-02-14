@@ -1,10 +1,7 @@
 """Tests for game validator."""
 
-import pytest
-
 from src.game.models import Card, TableGame
 from src.game.validator import (
-    ValidationResult,
     can_attach,
     can_substitute_joker,
     card_points,
@@ -179,7 +176,7 @@ class TestIsValidOpening:
         # Tris of Ks (30) + tris of 5s (15) = 45 >= 40
         games = [
             [c("Kh"), c("Kd"), c("Kc")],  # 30
-            [c("5h"), c("5d"), c("5c")],   # 15
+            [c("5h"), c("5d"), c("5c")],  # 15
         ]
         result = is_valid_opening(games)
         assert result.valid
@@ -188,7 +185,7 @@ class TestIsValidOpening:
     def test_over_40_points(self):
         games = [
             [c("Jh"), c("Qh"), c("Kh")],  # 30 (sequence)
-            [c("Ah"), c("Ad"), c("Ac")],   # 33 (tris, Ace=11)
+            [c("Ah"), c("Ad"), c("Ac")],  # 33 (tris, Ace=11)
         ]
         result = is_valid_opening(games)
         assert result.valid
@@ -197,7 +194,7 @@ class TestIsValidOpening:
     def test_under_40_points(self):
         games = [
             [c("3h"), c("4h"), c("5h")],  # 12
-            [c("2d"), c("2c"), c("2s")],   # 6
+            [c("2d"), c("2c"), c("2s")],  # 6
         ]
         result = is_valid_opening(games)
         assert not result.valid
@@ -214,8 +211,8 @@ class TestIsValidOpening:
         # Sequence: Joker-Kh-Ah = J(=Qh=10)+K(10)+A(11) = 31
         # Plus tris of 5s = 15
         # Total = 46 >= 40? Wait, let me recount.
-        # Joker, Kh, Ah -> sequence Qh,Kh,Ah -> 10+10+11=31... but is the joker calculated as Q?
-        # Actually in our validator, the sequence would be ranks [12(Q via joker), 13, 14(A-high)]
+        # Joker, Kh, Ah -> sequence Qh,Kh,Ah -> 10+10+11=31
+        # Sequence ranks: [12(Q via joker), 13, 14(A-high)]
         # points: 10+10+11=31. Plus tris of 5s=15 -> 46 >= 40 ✓
         games = [
             [JOKER, c("Kh"), c("Ah")],
@@ -233,7 +230,8 @@ class TestIsValidOpening:
 class TestCanAttach:
     def test_extend_sequence_end(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -242,7 +240,8 @@ class TestCanAttach:
 
     def test_extend_sequence_start(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -251,7 +250,8 @@ class TestCanAttach:
 
     def test_wrong_suit_sequence(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -260,7 +260,8 @@ class TestCanAttach:
 
     def test_wrong_rank_sequence(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -269,7 +270,8 @@ class TestCanAttach:
 
     def test_add_to_combination(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), c("8d"), c("8c")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -278,7 +280,8 @@ class TestCanAttach:
 
     def test_combination_full(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), c("8d"), c("8c"), c("8s")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -287,7 +290,8 @@ class TestCanAttach:
 
     def test_combination_same_suit_invalid(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), c("8d"), c("8c")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -296,13 +300,15 @@ class TestCanAttach:
 
     def test_ace_extends_sequence_at_end(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("Qh"), c("Kh")],  # Wait, this is only 2 cards
             game_type=GAME_TYPE_SEQUENCE,
         )
         # Let's use a valid 3-card sequence
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("Jh"), c("Qh"), c("Kh")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -313,7 +319,8 @@ class TestCanAttach:
 class TestCanSubstituteJoker:
     def test_substitute_in_combination(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), JOKER, c("8c")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -323,7 +330,8 @@ class TestCanSubstituteJoker:
 
     def test_substitute_wrong_rank(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), JOKER, c("8c")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -332,7 +340,8 @@ class TestCanSubstituteJoker:
 
     def test_substitute_in_sequence(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), JOKER, c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -341,7 +350,8 @@ class TestCanSubstituteJoker:
 
     def test_substitute_wrong_card_in_sequence(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), JOKER, c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -350,7 +360,8 @@ class TestCanSubstituteJoker:
 
     def test_no_joker_to_substitute(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), c("8d"), c("8c")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -359,7 +370,8 @@ class TestCanSubstituteJoker:
 
     def test_cannot_substitute_joker_with_joker(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("8h"), JOKER, c("8c")],
             game_type=GAME_TYPE_COMBINATION,
         )
@@ -404,7 +416,8 @@ class TestIsValidDiscard:
 
     def test_cannot_discard_attachable_multiplayer(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -420,7 +433,8 @@ class TestIsValidDiscard:
 
     def test_can_discard_attachable_when_closing(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )
@@ -436,7 +450,8 @@ class TestIsValidDiscard:
 
     def test_attachable_allowed_in_2_player(self):
         tg = TableGame(
-            game_id="t1", owner="p1",
+            game_id="t1",
+            owner="p1",
             cards=[c("3h"), c("4h"), c("5h")],
             game_type=GAME_TYPE_SEQUENCE,
         )

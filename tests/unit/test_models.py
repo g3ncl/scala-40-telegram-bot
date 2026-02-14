@@ -1,7 +1,6 @@
 """Tests for game data models."""
 
 from src.game.models import Card, GameState, PlayerState, TableGame
-from src.utils.constants import JOKER_SUIT, JOKER_RANK
 
 
 class TestCard:
@@ -133,7 +132,11 @@ class TestTableGame:
         tg = TableGame(
             game_id="abc123",
             owner="p1",
-            cards=[Card(suit="h", rank=3, deck=0), Card(suit="h", rank=4, deck=0), Card(suit="h", rank=5, deck=0)],
+            cards=[
+                Card(suit="h", rank=3, deck=0),
+                Card(suit="h", rank=4, deck=0),
+                Card(suit="h", rank=5, deck=0),
+            ],
             game_type="sequence",
         )
         restored = TableGame.from_dict(tg.to_dict())
