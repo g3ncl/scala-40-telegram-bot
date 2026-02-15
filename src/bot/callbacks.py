@@ -10,8 +10,14 @@ from src.bot.messages import (
     build_attach_target_keyboard,
     build_card_select_keyboard,
     build_discard_keyboard,
+    build_draw_keyboard,
+    build_lobby_keyboard,
+    build_main_menu_keyboard,
     build_play_keyboard,
     format_hand,
+    format_help,
+    format_lobby,
+    format_table,
 )
 from src.bot.notifications import (
     notify_round_end,
@@ -38,6 +44,8 @@ def handle_callback(
     prefix = data.split(":")[0]
 
     dispatch = {
+        "main": _cb_main,
+        "lobby": _cb_lobby,
         "draw": _cb_draw,
         "menu": _cb_menu,
         "card": _cb_card_toggle,
@@ -55,6 +63,189 @@ def handle_callback(
         return
 
     handler(user_id, chat_id, message_id, data, cq_id, deps)
+
+
+# --- Main Menu ---
+
+
+def _cb_main(
+    user_id: str,
+    chat_id: str,
+    message_id: int,
+    data: str,
+    cq_id: str,
+    deps: Deps,
+) -> None:
+    action = data.split(":")[1]
+
+    if action == "new":
+        _ensure_user(user_id, chat_id, deps)
+        result = deps.lobby_manager.create_lobby(user_id, chat_id)
+        if not result.success:
+            deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
+            return
+        lobby = result.lobby
+        assert lobby is not None
+        # Save lobby ref
+        user = deps.user_repo.get_user(user_id)
+        if user:
+            user["currentLobbyId"] = lobby["lobbyId"]
+            deps.user_repo.save_user(user)
+
+        deps.telegram.answer_callback_query(cq_id, text="Lobby creata!")
+        deps.telegram.edit_message(
+            chat_id,
+            message_id,
+            format_lobby(lobby),
+            reply_markup=build_lobby_keyboard(lobby, user_id),
+        )
+
+    elif action == "help":
+        deps.telegram.answer_callback_query(cq_id)
+        deps.telegram.edit_message(
+            chat_id,
+            message_id,
+            format_help(),
+            reply_markup=build_main_menu_keyboard(),
+        )
+
+
+# --- Lobby ---
+
+
+def _cb_lobby(
+    user_id: str,
+    chat_id: str,
+    message_id: int,
+    data: str,
+    cq_id: str,
+    deps: Deps,
+) -> None:
+    action = data.split(":")[1]
+    
+    # Need to find which lobby we are talking about.
+    # Usually we rely on user's currentLobbyId, but if they click a button on an old message...
+    # For now, rely on user record.
+    user = deps.user_repo.get_user(user_id)
+    if not user or not user.get("currentLobbyId"):
+        deps.telegram.answer_callback_query(cq_id, text="Non sei in una lobby")
+        return
+    lobby_id = user["currentLobbyId"]
+
+    if action == "ready":
+        result = deps.lobby_manager.set_ready(user_id, lobby_id)
+        if not result.success:
+            deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
+            return
+        deps.telegram.answer_callback_query(cq_id, text="Stato aggiornato")
+        assert result.lobby is not None
+        deps.telegram.edit_message(
+            chat_id,
+            message_id,
+            format_lobby(result.lobby),
+            reply_markup=build_lobby_keyboard(result.lobby, user_id),
+        )
+
+    elif action == "leave":
+        result = deps.lobby_manager.leave_lobby(user_id, lobby_id)
+        if not result.success:
+            deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
+            return
+        
+        user["currentLobbyId"] = None
+        deps.user_repo.save_user(user)
+        
+        deps.telegram.answer_callback_query(cq_id, text="Hai lasciato la lobby")
+        # If host left, lobby might be closed. If just player, update message.
+        # But we can't easily update the message if we are no longer in the lobby (we don't get the lobby back if closed).
+        # However, leave_lobby returns the lobby state.
+        
+        lobby = result.lobby
+        if lobby and lobby.get("status") != "closed":
+             # We left, but lobby exists. Update message for others? 
+             # Wait, we are editing OUR message. We should probably show main menu.
+             deps.telegram.edit_message(
+                chat_id,
+                message_id,
+                "Hai lasciato la lobby.",
+                reply_markup=build_main_menu_keyboard(),
+             )
+        else:
+             deps.telegram.edit_message(
+                chat_id,
+                message_id,
+                "Lobby chiusa.",
+                reply_markup=build_main_menu_keyboard(),
+             )
+
+    elif action == "refresh":
+        lobby = deps.lobby_manager.get_lobby(lobby_id)
+        if not lobby:
+            deps.telegram.answer_callback_query(cq_id, text="Lobby non trovata")
+            return
+        deps.telegram.answer_callback_query(cq_id, text="Aggiornato")
+        deps.telegram.edit_message(
+            chat_id,
+            message_id,
+            format_lobby(lobby),
+            reply_markup=build_lobby_keyboard(lobby, user_id),
+        )
+
+    elif action == "start":
+        result = deps.lobby_manager.start_game(user_id, lobby_id)
+        if not result.success:
+            deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
+            return
+        
+        deps.telegram.answer_callback_query(cq_id, text="Partita avviata!")
+        game_id = result.game_id
+        lobby = result.lobby
+        assert game_id is not None
+        assert lobby is not None
+
+        # Set currentGameId on all players
+        for p in lobby["players"]:
+            pid = p["userId"]
+            pu = deps.user_repo.get_user(pid)
+            if pu is None:
+                pu = {"userId": pid, "chatId": chat_id}
+            pu["currentGameId"] = game_id
+            deps.user_repo.save_user(pu)
+
+        game = deps.engine.get_game(game_id)
+        assert game is not None
+        
+        # We can edit the lobby message to show the table, or send a new one.
+        # Sending a new one is better for history.
+        # But we should probably remove the "Start" button from the lobby message so it's not clicked again.
+        deps.telegram.edit_message(
+            chat_id,
+            message_id,
+            f"Partita avviata! (Lobby {lobby.get('code')})",
+            reply_markup=None
+        )
+
+        # Send table to group chat (if we knew it... but here chat_id is the user's chat or the group chat where button was clicked)
+        deps.telegram.send_message(chat_id, format_table(game))
+
+        # DM each player
+        for player in game.players:
+            pu = deps.user_repo.get_user(player.user_id)
+            # If we don't know their chat_id, we can't DM. 
+            # But we saved chatId in _ensure_user when they joined/interacted.
+            player_chat = pu["chatId"] if pu else chat_id
+            deps.telegram.send_message(player_chat, format_hand(player))
+
+        # Send draw keyboard to current player
+        current = game.get_player(game.current_turn_user_id)
+        has_opened = current.has_opened if current else False
+        cu = deps.user_repo.get_user(game.current_turn_user_id)
+        current_chat = cu["chatId"] if cu else chat_id
+        deps.telegram.send_message(
+            current_chat,
+            "Il tuo turno! Pesca una carta.",
+            reply_markup=build_draw_keyboard(has_opened),
+        )
 
 
 # --- Draw ---
@@ -485,3 +676,15 @@ def _get_group_chat(game, deps: Deps) -> str | None:
     if lobby is None:
         return None
     return lobby.get("chatId")
+
+
+def _ensure_user(user_id: str, chat_id: str, deps: Deps) -> None:
+    """Create user record if it doesn't exist."""
+    user = deps.user_repo.get_user(user_id)
+    if user is None:
+        deps.user_repo.save_user(
+            {
+                "userId": user_id,
+                "chatId": chat_id,
+            }
+        )

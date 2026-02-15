@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 from src.bot.messages import (
     build_draw_keyboard,
+    build_lobby_keyboard,
+    build_main_menu_keyboard,
     format_hand,
     format_help,
     format_lobby,
@@ -68,11 +70,15 @@ def _cmd_start(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
                 "chatId": chat_id,
             }
         )
-    deps.telegram.send_message(chat_id, format_welcome())
+    deps.telegram.send_message(
+        chat_id, format_welcome(), reply_markup=build_main_menu_keyboard()
+    )
 
 
 def _cmd_help(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
-    deps.telegram.send_message(chat_id, format_help())
+    deps.telegram.send_message(
+        chat_id, format_help(), reply_markup=build_main_menu_keyboard()
+    )
 
 
 def _cmd_newlobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
@@ -88,7 +94,9 @@ def _cmd_newlobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     if user:
         user["currentLobbyId"] = lobby["lobbyId"]
         deps.user_repo.save_user(user)
-    deps.telegram.send_message(chat_id, format_lobby(lobby))
+    deps.telegram.send_message(
+        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+    )
 
 
 def _cmd_join(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
@@ -108,7 +116,9 @@ def _cmd_join(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     if user:
         user["currentLobbyId"] = lobby["lobbyId"]
         deps.user_repo.save_user(user)
-    deps.telegram.send_message(chat_id, format_lobby(lobby))
+    deps.telegram.send_message(
+        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+    )
 
 
 def _cmd_leave(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
@@ -122,7 +132,9 @@ def _cmd_leave(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
         return
     user["currentLobbyId"] = None
     deps.user_repo.save_user(user)
-    deps.telegram.send_message(chat_id, "Hai lasciato la lobby.")
+    deps.telegram.send_message(
+        chat_id, "Hai lasciato la lobby.", reply_markup=build_main_menu_keyboard()
+    )
 
 
 def _cmd_ready(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
@@ -136,7 +148,9 @@ def _cmd_ready(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
         return
     lobby = result.lobby
     assert lobby is not None
-    deps.telegram.send_message(chat_id, format_lobby(lobby))
+    deps.telegram.send_message(
+        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+    )
 
 
 def _cmd_lobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
@@ -148,7 +162,9 @@ def _cmd_lobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     if lobby is None:
         deps.telegram.send_message(chat_id, "Lobby non trovata.")
         return
-    deps.telegram.send_message(chat_id, format_lobby(lobby))
+    deps.telegram.send_message(
+        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+    )
 
 
 def _cmd_startgame(args: str, user_id: str, chat_id: str, deps: Deps) -> None:

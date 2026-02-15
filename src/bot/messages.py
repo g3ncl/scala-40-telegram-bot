@@ -119,6 +119,48 @@ def format_scores(game: GameState) -> str:
 # --- Keyboard builders ---
 
 
+def build_main_menu_keyboard() -> dict:
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "🆕 Crea Partita", "callback_data": "main:new"},
+                {"text": "❓ Aiuto", "callback_data": "main:help"},
+            ],
+            # Join is complex via buttons without a conversation handler,
+            # but we can add a button that explains how to join.
+            # {"text": "🔑 Entra in partita", "callback_data": "main:join_info"},
+        ]
+    }
+
+
+def build_lobby_keyboard(lobby: dict, user_id: str) -> dict:
+    host_id = lobby.get("hostUserId")
+    players = lobby.get("players", [])
+    is_host = user_id == host_id
+    
+    me = next((p for p in players if p["userId"] == user_id), None)
+    is_ready = me.get("ready", False) if me else False
+    
+    ready_text = "❌ Non pronto" if is_ready else "✅ Pronto"
+    ready_cb = "lobby:ready"
+    
+    rows = [
+        [{"text": ready_text, "callback_data": ready_cb}],
+    ]
+    
+    if is_host:
+        # Start button enabled only if everyone ready and min players
+        all_ready = all(p.get("ready") for p in players)
+        count = len(players)
+        if count >= 2 and all_ready:
+            rows.append([{"text": "🚀 Avvia Partita", "callback_data": "lobby:start"}])
+            
+    rows.append([{"text": "🚪 Esci", "callback_data": "lobby:leave"}])
+    rows.append([{"text": "🔄 Aggiorna", "callback_data": "lobby:refresh"}])
+    
+    return {"inline_keyboard": rows}
+
+
 def build_draw_keyboard(has_opened: bool = False) -> dict:
     buttons = [{"text": "Pesca dal mazzo", "callback_data": "draw:deck"}]
     if has_opened:
