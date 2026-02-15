@@ -89,6 +89,7 @@ def display_table(game: GameState) -> str:
 def display_actions(game: GameState, user_id: str) -> str:
     """Show available actions."""
     player = game.get_player(user_id)
+    assert player is not None
     lines = ["  Azioni disponibili:"]
 
     if game.turn_phase == PHASE_DRAW:
@@ -127,6 +128,7 @@ def play_game(num_players: int, seed: int | None = None) -> None:
     if not result.success:
         print(f"Errore avvio: {result.error}")
         return
+    assert result.game is not None
     game = result.game
 
     print("\n  Benvenuti a Scala 40!")
@@ -140,6 +142,7 @@ def play_game(num_players: int, seed: int | None = None) -> None:
 
         current = game.current_turn_user_id
         player = game.get_player(current)
+        assert player is not None
         print(f"  --- Mano di {current} ---")
         print(display_hand(player.hand))
         print()
@@ -227,6 +230,7 @@ def play_game(num_players: int, seed: int | None = None) -> None:
             continue
 
         if result.success:
+            assert result.game is not None
             game = result.game
             for event in result.events:
                 ev_type = event.get("event", "")
@@ -256,6 +260,7 @@ def play_game(num_players: int, seed: int | None = None) -> None:
             print("\n  Fine della smazzata. Inizio nuova smazzata...")
             result = engine.start_round(game.game_id)
             if result.success:
+                assert result.game is not None
                 game = result.game
             else:
                 print(f"  Errore: {result.error}")
@@ -264,7 +269,9 @@ def play_game(num_players: int, seed: int | None = None) -> None:
     if game.status == STATUS_FINISHED:
         print("\n  Partita terminata!")
         for uid, score in sorted(game.scores.items(), key=lambda x: x[1]):
-            eliminated = game.get_player(uid).is_eliminated
+            player = game.get_player(uid)
+            assert player is not None
+            eliminated = player.is_eliminated
             status = " (ELIMINATO)" if eliminated else ""
             print(f"    {uid}: {score} punti{status}")
 

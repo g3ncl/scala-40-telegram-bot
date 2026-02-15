@@ -38,13 +38,19 @@ def _setup_game(deps: Deps) -> str:
     handle_command("/start", "", "u2", "chat2", deps)
     handle_command("/newlobby", "", "u1", "chat1", deps)
     user = deps.user_repo.get_user("u1")
+    assert user is not None
+    assert user.get("currentLobbyId") is not None
     lobby = deps.lobby_repo.get_lobby(user["currentLobbyId"])
+    assert lobby is not None
     handle_command("/join", lobby["code"], "u2", "chat2", deps)
     handle_command("/ready", "", "u1", "chat1", deps)
     handle_command("/ready", "", "u2", "chat2", deps)
     handle_command("/startgame", "", "u1", "chat1", deps)
     user = deps.user_repo.get_user("u1")
-    return user["currentGameId"]
+    assert user is not None
+    res = user.get("currentGameId")
+    assert isinstance(res, str)
+    return res
 
 
 class TestDrawCallback:

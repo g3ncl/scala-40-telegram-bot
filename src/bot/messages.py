@@ -2,9 +2,38 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from src.game.models import Card, GameState, PlayerState, TableGame
 from src.game.validator import can_attach
 from src.utils.constants import PHASE_DISCARD, PHASE_DRAW, PHASE_PLAY
+
+if TYPE_CHECKING:
+    from src.bot.deps import Deps
+
+# --- Helpers ---
+
+
+def _get_display_name(user_id: str, deps: Deps | None = None) -> str:
+    """Get display name: @username > First Last > user_id."""
+    if deps is None:
+        return user_id
+
+    user = deps.user_repo.get_user(user_id)
+    if not user:
+        return user_id
+
+    if user.get("username"):
+        return f"@{user['username']}"
+
+    first = user.get("first_name", "")
+    last = user.get("last_name", "")
+    full = f"{first} {last}".strip()
+    if full:
+        return full
+
+    return user_id
+
 
 # --- Text formatters ---
 
@@ -51,7 +80,7 @@ def format_hand(player: PlayerState) -> str:
     return "\n".join(lines)
 
 
-def format_table(game: GameState) -> str:
+def format_table(game: GameState, deps: Deps | None = None) -> str:
     phase_names = {
         PHASE_DRAW: "Pesca",
         PHASE_PLAY: "Gioco",
@@ -59,9 +88,10 @@ def format_table(game: GameState) -> str:
     }
     phase = phase_names.get(game.turn_phase, game.turn_phase)
 
+    current_name = _get_display_name(game.current_turn_user_id, deps)
     lines = [
         f"<b>SCALA 40</b> — Smazzata #{game.smazzata_number}\n",
-        f"Turno di: <b>{game.current_turn_user_id}</b> (fase: {phase})",
+        f"Turno di: <b>{current_name}</b> (fase: {phase})",
     ]
 
     if game.discard_pile:
@@ -74,45 +104,52 @@ def format_table(game: GameState) -> str:
         lines.append("<b>Giochi sul tavolo:</b>")
         for tg in game.table_games:
             cards_str = " ".join(c.display() for c in tg.cards)
-            lines.append(f"  {tg.owner}: [{cards_str}]")
+            owner_name = _get_display_name(tg.owner, deps)
+            lines.append(f"  {owner_name}: [{cards_str}]")
         lines.append("")
 
     lines.append("<b>Carte in mano:</b>")
     for p in game.players:
+        p_name = _get_display_name(p.user_id, deps)
         if p.is_eliminated:
-            lines.append(f"  {p.user_id}: ELIMINATO")
+            lines.append(f"  {p_name}: ELIMINATO")
             continue
         marker = " &lt;&lt;" if p.user_id == game.current_turn_user_id else ""
         opened = "" if p.has_opened else " (chiuso)"
-        lines.append(f"  {p.user_id}: {len(p.hand)} carte{opened}{marker}")
+        lines.append(f"  {p_name}: {len(p.hand)} carte{opened}{marker}")
 
     lines.append("")
-    scores = " | ".join(f"{uid}: {s}" for uid, s in game.scores.items())
-    lines.append(f"Punteggi: {scores}")
+    score_parts = []
+    for uid, s in game.scores.items():
+        u_name = _get_display_name(uid, deps)
+        score_parts.append(f"{u_name}: {s}")
+    lines.append(f"Punteggi: {' | '.join(score_parts)}")
     return "\n".join(lines)
 
 
-def format_lobby(lobby: dict) -> str:
+def format_lobby(lobby: dict, deps: Deps | None = None) -> str:
     code = lobby.get("code", "???")
     lines = [f"<b>Lobby #{code}</b>\n"]
     lines.append("Giocatori:")
     for p in lobby.get("players", []):
         check = "+" if p.get("ready") else "-"
         uid = p.get("userId", "?")
+        u_name = _get_display_name(uid, deps)
         status = "pronto" if p.get("ready") else "non pronto"
-        lines.append(f"  {check} {uid} ({status})")
+        lines.append(f"  {check} {u_name} ({status})")
     return "\n".join(lines)
 
 
-def format_scores(game: GameState) -> str:
+def format_scores(game: GameState, deps: Deps | None = None) -> str:
     lines = ["<b>Punteggi:</b>"]
     sorted_scores = sorted(game.scores.items(), key=lambda x: x[1])
     for uid, score in sorted_scores:
         player = game.get_player(uid)
+        u_name = _get_display_name(uid, deps)
         status = ""
         if player and player.is_eliminated:
             status = " (eliminato)"
-        lines.append(f"  {uid}: {score}{status}")
+        lines.append(f"  {u_name}: {score}{status}")
     return "\n".join(lines)
 
 
@@ -137,27 +174,27 @@ def build_lobby_keyboard(lobby: dict, user_id: str) -> dict:
     host_id = lobby.get("hostUserId")
     players = lobby.get("players", [])
     is_host = user_id == host_id
-    
+
     me = next((p for p in players if p["userId"] == user_id), None)
     is_ready = me.get("ready", False) if me else False
-    
+
     ready_text = "❌ Non pronto" if is_ready else "✅ Pronto"
     ready_cb = "lobby:ready"
-    
+
     rows = [
         [{"text": ready_text, "callback_data": ready_cb}],
     ]
-    
+
     if is_host:
         # Start button enabled only if everyone ready and min players
         all_ready = all(p.get("ready") for p in players)
         count = len(players)
         if count >= 2 and all_ready:
             rows.append([{"text": "🚀 Avvia Partita", "callback_data": "lobby:start"}])
-            
+
     rows.append([{"text": "🚪 Esci", "callback_data": "lobby:leave"}])
     rows.append([{"text": "🔄 Aggiorna", "callback_data": "lobby:refresh"}])
-    
+
     return {"inline_keyboard": rows}
 
 
@@ -263,7 +300,9 @@ def build_attach_card_keyboard(cards: list[Card]) -> dict:
     return {"inline_keyboard": rows}
 
 
-def build_attach_target_keyboard(card: Card, table_games: list[TableGame]) -> dict:
+def build_attach_target_keyboard(
+    card: Card, table_games: list[TableGame], deps: Deps | None = None
+) -> dict:
     """Show valid table games to attach to."""
     rows: list[list[dict]] = []
     for tg in table_games:
@@ -272,7 +311,8 @@ def build_attach_target_keyboard(card: Card, table_games: list[TableGame]) -> di
         cards_str = " ".join(c.display() for c in tg.cards[:5])
         if len(tg.cards) > 5:
             cards_str += "..."
-        label = f"{tg.owner}: {cards_str}"
+        owner_name = _get_display_name(tg.owner, deps)
+        label = f"{owner_name}: {cards_str}"
         cb = f"att_tg:{card.compact()}:{tg.game_id[:6]}"
         rows.append([{"text": label, "callback_data": cb}])
     rows.append([{"text": "Annulla", "callback_data": "cancel"}])

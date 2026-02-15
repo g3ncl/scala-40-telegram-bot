@@ -1,6 +1,7 @@
 """Tests for bot message formatting and keyboard builders."""
 
 from src.bot.messages import (
+    _get_display_name,
     build_attach_target_keyboard,
     build_card_select_keyboard,
     build_discard_keyboard,
@@ -48,6 +49,31 @@ def _make_game() -> GameState:
     )
 
 
+class TestGetDisplayName:
+    def test_fallback_to_id_no_deps(self):
+        assert _get_display_name("u1") == "u1"
+
+    def test_fallback_to_id_no_user(self, deps_with_user):
+        deps, _ = deps_with_user
+        assert _get_display_name("u2", deps) == "u2"
+
+    def test_username_priority(self, deps_with_user):
+        deps, _ = deps_with_user
+        assert _get_display_name("u1", deps) == "@user1"
+
+    def test_fullname_priority(self, deps_with_user):
+        deps, _ = deps_with_user
+        deps.user_repo.save_user(
+            {"userId": "u1", "first_name": "Mario", "last_name": "Rossi"}
+        )
+        assert _get_display_name("u1", deps) == "Mario Rossi"
+
+    def test_firstname_only(self, deps_with_user):
+        deps, _ = deps_with_user
+        deps.user_repo.save_user({"userId": "u1", "first_name": "Mario"})
+        assert _get_display_name("u1", deps) == "Mario"
+
+
 class TestFormatWelcome:
     def test_contains_commands(self):
         text = format_welcome()
@@ -58,9 +84,7 @@ class TestFormatWelcome:
 
 class TestFormatHand:
     def test_shows_cards(self):
-        player = PlayerState(
-            user_id="p1", hand=[c("Ks"), c("3h"), c("5d")]
-        )
+        player = PlayerState(user_id="p1", hand=[c("Ks"), c("3h"), c("5d")])
         text = format_hand(player)
         assert "3 carte" in text
         assert "K" in text
@@ -133,22 +157,14 @@ class TestBuildDrawKeyboard:
 class TestBuildPlayKeyboard:
     def test_opened_has_play_attach_discard(self):
         kb = build_play_keyboard(has_opened=True)
-        all_cb = [
-            btn["callback_data"]
-            for row in kb["inline_keyboard"]
-            for btn in row
-        ]
+        all_cb = [btn["callback_data"] for row in kb["inline_keyboard"] for btn in row]
         assert "menu:play" in all_cb
         assert "menu:attach" in all_cb
         assert "menu:discard" in all_cb
 
     def test_not_opened_has_open_discard(self):
         kb = build_play_keyboard(has_opened=False)
-        all_cb = [
-            btn["callback_data"]
-            for row in kb["inline_keyboard"]
-            for btn in row
-        ]
+        all_cb = [btn["callback_data"] for row in kb["inline_keyboard"] for btn in row]
         assert "menu:open" in all_cb
         assert "menu:discard" in all_cb
 

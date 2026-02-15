@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     )
     from src.game.engine import GameEngine
     from src.lobby.manager import LobbyManager
-    from src.utils.telegram import TelegramClient
+    from src.utils.telegram import TelegramClientProtocol
 
 
 @dataclass
@@ -25,4 +25,4 @@ class Deps:
     game_repo: GameRepository
     lobby_repo: LobbyRepository
     user_repo: UserRepository
-    telegram: TelegramClient
+    telegram: TelegramClientProtocol

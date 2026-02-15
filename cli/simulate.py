@@ -71,6 +71,7 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
     """Execute one AI turn. Returns updated game state."""
     uid = game.current_turn_user_id
     player = game.get_player(uid)
+    assert player is not None
 
     # Draw phase
     if game.turn_phase == PHASE_DRAW:
@@ -102,11 +103,13 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
             result = engine.process_draw(game.game_id, uid, "deck")
         if not result.success:
             raise RuntimeError(f"Draw failed: {result.error}")
+        assert result.game is not None
         game = result.game
 
     # Play phase
     if game.turn_phase in (PHASE_PLAY, PHASE_DISCARD):
         player = game.get_player(uid)
+        assert player is not None
 
         # Try to open if not opened
         if not player.has_opened:
@@ -114,8 +117,10 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
             if opening:
                 result = engine.process_open(game.game_id, uid, opening)
                 if result.success:
+                    assert result.game is not None
                     game = result.game
                     player = game.get_player(uid)
+                    assert player is not None
 
         # If opened, try to play more games or attach
         # Keep at least 1 card for discard (unless we can close)
@@ -132,8 +137,10 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
                     if vr.valid:
                         result = engine.process_play(game.game_id, uid, cards)
                         if result.success:
+                            assert result.game is not None
                             game = result.game
                             player = game.get_player(uid)
+                            assert player is not None
                             break
 
             # Try to attach cards (keep at least 1 for discard)
@@ -149,13 +156,16 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
                             game.game_id, uid, card, tg.game_id
                         )
                         if result.success:
+                            assert result.game is not None
                             game = result.game
                             player = game.get_player(uid)
+                            assert player is not None
                             break
 
     # Discard phase
     if game.turn_phase in (PHASE_PLAY, PHASE_DISCARD):
         player = game.get_player(uid)
+        assert player is not None
         if not player.hand:
             # Edge case: player somehow has 0 cards without closing
             # This shouldn't happen with the guard above
@@ -168,6 +178,7 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
         for card in hand_shuffled:
             result = engine.process_discard(game.game_id, uid, card)
             if result.success:
+                assert result.game is not None
                 return result.game
 
         # If no valid discard found (e.g., drawn from discard and all cards
@@ -177,6 +188,7 @@ def ai_turn(engine: GameEngine, game: GameState, rng: random.Random) -> GameStat
         for card in player.hand:
             result = engine.process_discard(game.game_id, uid, card)
             if result.success:
+                assert result.game is not None
                 return result.game
 
         # True deadlock - skip turn by forcing discard
@@ -194,6 +206,7 @@ def simulate_game(num_players: int, rng: random.Random, verbose: bool = False) -
     player_ids = [f"p{i + 1}" for i in range(num_players)]
     game = engine.create_game(player_ids, lobby_id="sim")
     result = engine.start_round(game.game_id)
+    assert result.game is not None
     game = result.game
 
     max_turns = 5000
@@ -206,6 +219,7 @@ def simulate_game(num_players: int, rng: random.Random, verbose: bool = False) -
             result = engine.start_round(game.game_id)
             if not result.success:
                 return {"error": result.error, "turns": turn_count}
+            assert result.game is not None
             game = result.game
 
         if game.status != STATUS_PLAYING:

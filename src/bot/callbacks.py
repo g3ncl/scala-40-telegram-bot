@@ -39,6 +39,7 @@ def handle_callback(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     """Dispatch callback query by prefix."""
     prefix = data.split(":")[0]
@@ -62,7 +63,7 @@ def handle_callback(
         deps.telegram.answer_callback_query(cq_id, text="Azione non valida")
         return
 
-    handler(user_id, chat_id, message_id, data, cq_id, deps)
+    handler(user_id, chat_id, message_id, data, cq_id, deps, user_info)
 
 
 # --- Main Menu ---
@@ -75,11 +76,12 @@ def _cb_main(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     action = data.split(":")[1]
 
     if action == "new":
-        _ensure_user(user_id, chat_id, deps)
+        _ensure_user(user_id, chat_id, deps, user_info)
         result = deps.lobby_manager.create_lobby(user_id, chat_id)
         if not result.success:
             deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
@@ -96,7 +98,7 @@ def _cb_main(
         deps.telegram.edit_message(
             chat_id,
             message_id,
-            format_lobby(lobby),
+            format_lobby(lobby, deps),
             reply_markup=build_lobby_keyboard(lobby, user_id),
         )
 
@@ -120,11 +122,13 @@ def _cb_lobby(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     action = data.split(":")[1]
-    
+
     # Need to find which lobby we are talking about.
-    # Usually we rely on user's currentLobbyId, but if they click a button on an old message...
+    # Usually we rely on user's currentLobbyId, but if they click a button
+    # on an old message...
     # For now, rely on user record.
     user = deps.user_repo.get_user(user_id)
     if not user or not user.get("currentLobbyId"):
@@ -142,7 +146,7 @@ def _cb_lobby(
         deps.telegram.edit_message(
             chat_id,
             message_id,
-            format_lobby(result.lobby),
+            format_lobby(result.lobby, deps),
             reply_markup=build_lobby_keyboard(result.lobby, user_id),
         )
 
@@ -151,32 +155,33 @@ def _cb_lobby(
         if not result.success:
             deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
             return
-        
+
         user["currentLobbyId"] = None
         deps.user_repo.save_user(user)
-        
+
         deps.telegram.answer_callback_query(cq_id, text="Hai lasciato la lobby")
         # If host left, lobby might be closed. If just player, update message.
-        # But we can't easily update the message if we are no longer in the lobby (we don't get the lobby back if closed).
+        # But we can't easily update the message if we are no longer in the lobby
+        # (we don't get the lobby back if closed).
         # However, leave_lobby returns the lobby state.
-        
+
         lobby = result.lobby
         if lobby and lobby.get("status") != "closed":
-             # We left, but lobby exists. Update message for others? 
-             # Wait, we are editing OUR message. We should probably show main menu.
-             deps.telegram.edit_message(
+            # We left, but lobby exists. Update message for others?
+            # Wait, we are editing OUR message. We should probably show main menu.
+            deps.telegram.edit_message(
                 chat_id,
                 message_id,
                 "Hai lasciato la lobby.",
                 reply_markup=build_main_menu_keyboard(),
-             )
+            )
         else:
-             deps.telegram.edit_message(
+            deps.telegram.edit_message(
                 chat_id,
                 message_id,
                 "Lobby chiusa.",
                 reply_markup=build_main_menu_keyboard(),
-             )
+            )
 
     elif action == "refresh":
         lobby = deps.lobby_manager.get_lobby(lobby_id)
@@ -187,7 +192,7 @@ def _cb_lobby(
         deps.telegram.edit_message(
             chat_id,
             message_id,
-            format_lobby(lobby),
+            format_lobby(lobby, deps),
             reply_markup=build_lobby_keyboard(lobby, user_id),
         )
 
@@ -196,7 +201,7 @@ def _cb_lobby(
         if not result.success:
             deps.telegram.answer_callback_query(cq_id, text=result.error or "Errore")
             return
-        
+
         deps.telegram.answer_callback_query(cq_id, text="Partita avviata!")
         game_id = result.game_id
         lobby = result.lobby
@@ -214,29 +219,31 @@ def _cb_lobby(
 
         game = deps.engine.get_game(game_id)
         assert game is not None
-        
+
         # We can edit the lobby message to show the table, or send a new one.
         # Sending a new one is better for history.
-        # But we should probably remove the "Start" button from the lobby message so it's not clicked again.
+        # But we should probably remove the "Start" button from the lobby message
+        # so it's not clicked again.
         deps.telegram.edit_message(
             chat_id,
             message_id,
             f"Partita avviata! (Lobby {lobby.get('code')})",
-            reply_markup=None
+            reply_markup=None,
         )
 
-        # Send table to group chat (if we knew it... but here chat_id is the user's chat or the group chat where button was clicked)
-        deps.telegram.send_message(chat_id, format_table(game))
+        # Send table to group chat (if we knew it... but here chat_id is the user's
+        # chat or the group chat where button was clicked)
+        deps.telegram.send_message(chat_id, format_table(game, deps))
 
         # DM each player
         for player in game.players:
             pu = deps.user_repo.get_user(player.user_id)
-            # If we don't know their chat_id, we can't DM. 
+            # If we don't know their chat_id, we can't DM.
             # But we saved chatId in _ensure_user when they joined/interacted.
             player_chat = pu["chatId"] if pu else chat_id
             deps.telegram.send_message(player_chat, format_hand(player))
 
-        # Send draw keyboard to current player
+            # Send draw keyboard to current player
         current = game.get_player(game.current_turn_user_id)
         has_opened = current.has_opened if current else False
         cu = deps.user_repo.get_user(game.current_turn_user_id)
@@ -258,6 +265,7 @@ def _cb_draw(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "draw:deck" or "draw:discard"
     source = data.split(":")[1]
@@ -299,6 +307,7 @@ def _cb_menu(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     action = data.split(":")[1]
     game, err = _get_game(user_id, deps)
@@ -342,6 +351,7 @@ def _cb_card_toggle(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "card:{idx}:{action}:{mask}"
     parts = data.split(":")
@@ -373,6 +383,7 @@ def _cb_confirm(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "conf:{action}:{mask}" or "conf:open:{mask1}+{mask2}..."
     parts = data.split(":")
@@ -451,6 +462,7 @@ def _cb_group(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "grp:open:{current_mask}"
     # Save current group mask, start a new selection
@@ -500,6 +512,7 @@ def _cb_discard(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "disc:{compact}"
     compact = data.split(":", 1)[1]
@@ -544,6 +557,7 @@ def _cb_attach_card(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "att_card:{compact}"
     compact = data.split(":", 1)[1]
@@ -556,7 +570,7 @@ def _cb_attach_card(
     assert game is not None
 
     deps.telegram.answer_callback_query(cq_id)
-    kb = build_attach_target_keyboard(card, game.table_games)
+    kb = build_attach_target_keyboard(card, game.table_games, deps)
     deps.telegram.edit_message(
         chat_id,
         message_id,
@@ -572,6 +586,7 @@ def _cb_attach_target(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     # data = "att_tg:{compact}:{tg_prefix}"
     parts = data.split(":")
@@ -626,6 +641,7 @@ def _cb_cancel(
     data: str,
     cq_id: str,
     deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     game, err = _get_game(user_id, deps)
     if err:
@@ -678,13 +694,17 @@ def _get_group_chat(game, deps: Deps) -> str | None:
     return lobby.get("chatId")
 
 
-def _ensure_user(user_id: str, chat_id: str, deps: Deps) -> None:
-    """Create user record if it doesn't exist."""
+def _ensure_user(
+    user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
+    """Create or update user record with Telegram info."""
     user = deps.user_repo.get_user(user_id)
     if user is None:
-        deps.user_repo.save_user(
-            {
-                "userId": user_id,
-                "chatId": chat_id,
-            }
-        )
+        user = {"userId": user_id, "chatId": chat_id}
+
+    if user_info:
+        user["username"] = user_info.get("username")
+        user["first_name"] = user_info.get("first_name")
+        user["last_name"] = user_info.get("last_name")
+
+    deps.user_repo.save_user(user)

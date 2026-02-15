@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from src.bot.messages import (
+    _get_display_name,
     build_draw_keyboard,
     format_hand,
     format_scores,
@@ -44,7 +45,7 @@ def notify_turn_start(game: GameState, deps: Deps) -> None:
 
 def notify_table_update(game: GameState, chat_id: str, deps: Deps) -> None:
     """Send table state to the group chat."""
-    deps.telegram.send_message(chat_id, format_table(game))
+    deps.telegram.send_message(chat_id, format_table(game, deps))
 
 
 def notify_round_end(
@@ -55,25 +56,27 @@ def notify_round_end(
 ) -> None:
     """Handle round end: show scores, eliminations, start next round."""
     # Show scores
-    deps.telegram.send_message(chat_id, format_scores(game))
+    deps.telegram.send_message(chat_id, format_scores(game, deps))
 
     # Announce eliminations
     for ev in events:
         if ev.get("event") == "elimination":
             uid = ev["user_id"]
+            name = _get_display_name(uid, deps)
             score = ev.get("total_score", "?")
             deps.telegram.send_message(
                 chat_id,
-                f"<b>{uid}</b> eliminato! (punteggio: {score})",
+                f"<b>{name}</b> eliminato! (punteggio: {score})",
             )
 
     if game.status == STATUS_FINISHED:
         # Announce winner
         winner_ev = next((e for e in events if e.get("event") == "game_end"), None)
-        winner = winner_ev["winner"] if winner_ev else "?"
+        winner_id = winner_ev["winner"] if winner_ev else "?"
+        winner_name = _get_display_name(winner_id, deps)
         deps.telegram.send_message(
             chat_id,
-            f"<b>Partita finita!</b> Vince <b>{winner}</b>!",
+            f"<b>Partita finita!</b> Vince <b>{winner_name}</b>!",
         )
         # Clear currentGameId for all players
         for player in game.players:
@@ -99,7 +102,7 @@ def notify_round_end(
             chat_id,
             f"<b>Smazzata #{new_game.smazzata_number}</b>",
         )
-        deps.telegram.send_message(chat_id, format_table(new_game))
+        deps.telegram.send_message(chat_id, format_table(new_game, deps))
 
         # DM each active player their hand
         for player in new_game.get_active_players():

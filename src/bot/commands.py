@@ -24,7 +24,12 @@ logger = logging.getLogger("scala40.commands")
 
 
 def handle_command(
-    command: str, args: str, user_id: str, chat_id: str, deps: Deps
+    command: str,
+    args: str,
+    user_id: str,
+    chat_id: str,
+    deps: Deps,
+    user_info: dict | None = None,
 ) -> None:
     """Dispatch a slash command."""
     handlers = {
@@ -44,7 +49,7 @@ def handle_command(
     if handler is None:
         deps.telegram.send_message(chat_id, "Comando sconosciuto. Usa /help.")
         return
-    handler(args, user_id, chat_id, deps)
+    handler(args, user_id, chat_id, deps, user_info)
 
 
 def _get_user_game(user_id: str, deps: Deps):
@@ -61,28 +66,27 @@ def _get_user_game(user_id: str, deps: Deps):
     return game, None
 
 
-def _cmd_start(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
-    user = deps.user_repo.get_user(user_id)
-    if user is None:
-        deps.user_repo.save_user(
-            {
-                "userId": user_id,
-                "chatId": chat_id,
-            }
-        )
+def _cmd_start(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
+    _ensure_user(user_id, chat_id, deps, user_info)
     deps.telegram.send_message(
         chat_id, format_welcome(), reply_markup=build_main_menu_keyboard()
     )
 
 
-def _cmd_help(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_help(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     deps.telegram.send_message(
         chat_id, format_help(), reply_markup=build_main_menu_keyboard()
     )
 
 
-def _cmd_newlobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
-    _ensure_user(user_id, chat_id, deps)
+def _cmd_newlobby(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
+    _ensure_user(user_id, chat_id, deps, user_info)
     result = deps.lobby_manager.create_lobby(user_id, chat_id)
     if not result.success:
         deps.telegram.send_message(chat_id, f"Errore: {result.error}")
@@ -95,12 +99,16 @@ def _cmd_newlobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
         user["currentLobbyId"] = lobby["lobbyId"]
         deps.user_repo.save_user(user)
     deps.telegram.send_message(
-        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+        chat_id,
+        format_lobby(lobby, deps),
+        reply_markup=build_lobby_keyboard(lobby, user_id),
     )
 
 
-def _cmd_join(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
-    _ensure_user(user_id, chat_id, deps)
+def _cmd_join(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
+    _ensure_user(user_id, chat_id, deps, user_info)
     code = args.strip().upper()
     if not code:
         deps.telegram.send_message(chat_id, "Uso: /join CODICE")
@@ -117,11 +125,15 @@ def _cmd_join(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
         user["currentLobbyId"] = lobby["lobbyId"]
         deps.user_repo.save_user(user)
     deps.telegram.send_message(
-        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+        chat_id,
+        format_lobby(lobby, deps),
+        reply_markup=build_lobby_keyboard(lobby, user_id),
     )
 
 
-def _cmd_leave(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_leave(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     user = deps.user_repo.get_user(user_id)
     if user is None or not user.get("currentLobbyId"):
         deps.telegram.send_message(chat_id, "Non sei in una lobby.")
@@ -137,7 +149,9 @@ def _cmd_leave(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     )
 
 
-def _cmd_ready(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_ready(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     user = deps.user_repo.get_user(user_id)
     if user is None or not user.get("currentLobbyId"):
         deps.telegram.send_message(chat_id, "Non sei in una lobby.")
@@ -149,11 +163,15 @@ def _cmd_ready(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     lobby = result.lobby
     assert lobby is not None
     deps.telegram.send_message(
-        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+        chat_id,
+        format_lobby(lobby, deps),
+        reply_markup=build_lobby_keyboard(lobby, user_id),
     )
 
 
-def _cmd_lobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_lobby(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     user = deps.user_repo.get_user(user_id)
     if user is None or not user.get("currentLobbyId"):
         deps.telegram.send_message(chat_id, "Non sei in una lobby.")
@@ -163,11 +181,15 @@ def _cmd_lobby(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
         deps.telegram.send_message(chat_id, "Lobby non trovata.")
         return
     deps.telegram.send_message(
-        chat_id, format_lobby(lobby), reply_markup=build_lobby_keyboard(lobby, user_id)
+        chat_id,
+        format_lobby(lobby, deps),
+        reply_markup=build_lobby_keyboard(lobby, user_id),
     )
 
 
-def _cmd_startgame(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_startgame(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     user = deps.user_repo.get_user(user_id)
     if user is None or not user.get("currentLobbyId"):
         deps.telegram.send_message(chat_id, "Non sei in una lobby.")
@@ -195,7 +217,7 @@ def _cmd_startgame(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     assert game is not None
 
     # Send table to group chat
-    deps.telegram.send_message(chat_id, format_table(game))
+    deps.telegram.send_message(chat_id, format_table(game, deps))
 
     # DM each player their hand
     for player in game.players:
@@ -215,7 +237,9 @@ def _cmd_startgame(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     )
 
 
-def _cmd_hand(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_hand(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     game, err = _get_user_game(user_id, deps)
     if err:
         deps.telegram.send_message(chat_id, err)
@@ -228,31 +252,39 @@ def _cmd_hand(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
     deps.telegram.send_message(chat_id, format_hand(player))
 
 
-def _cmd_table(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_table(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     game, err = _get_user_game(user_id, deps)
     if err:
         deps.telegram.send_message(chat_id, err)
         return
     assert game is not None
-    deps.telegram.send_message(chat_id, format_table(game))
+    deps.telegram.send_message(chat_id, format_table(game, deps))
 
 
-def _cmd_scores(args: str, user_id: str, chat_id: str, deps: Deps) -> None:
+def _cmd_scores(
+    args: str, user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
     game, err = _get_user_game(user_id, deps)
     if err:
         deps.telegram.send_message(chat_id, err)
         return
     assert game is not None
-    deps.telegram.send_message(chat_id, format_scores(game))
+    deps.telegram.send_message(chat_id, format_scores(game, deps))
 
 
-def _ensure_user(user_id: str, chat_id: str, deps: Deps) -> None:
-    """Create user record if it doesn't exist."""
+def _ensure_user(
+    user_id: str, chat_id: str, deps: Deps, user_info: dict | None = None
+) -> None:
+    """Create or update user record with Telegram info."""
     user = deps.user_repo.get_user(user_id)
     if user is None:
-        deps.user_repo.save_user(
-            {
-                "userId": user_id,
-                "chatId": chat_id,
-            }
-        )
+        user = {"userId": user_id, "chatId": chat_id}
+
+    if user_info:
+        user["username"] = user_info.get("username")
+        user["first_name"] = user_info.get("first_name")
+        user["last_name"] = user_info.get("last_name")
+
+    deps.user_repo.save_user(user)

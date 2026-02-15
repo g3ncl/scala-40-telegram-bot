@@ -18,12 +18,18 @@ def route_update(update: dict, deps: Deps) -> None:
 
     if "callback_query" in update:
         cq = update["callback_query"]
-        user_id = str(cq["from"]["id"])
+        user_from = cq["from"]
+        user_id = str(user_from["id"])
+        user_info = {
+            "username": user_from.get("username"),
+            "first_name": user_from.get("first_name"),
+            "last_name": user_from.get("last_name"),
+        }
         chat_id = str(cq["message"]["chat"]["id"])
         message_id = cq["message"]["message_id"]
         data = cq.get("data", "")
         cq_id = cq["id"]
-        handle_callback(user_id, chat_id, message_id, data, cq_id, deps)
+        handle_callback(user_id, chat_id, message_id, data, cq_id, deps, user_info)
         return
 
     message = update.get("message")
@@ -34,7 +40,13 @@ def route_update(update: dict, deps: Deps) -> None:
     if not text.startswith("/"):
         return
 
-    user_id = str(message["from"]["id"])
+    user_from = message["from"]
+    user_id = str(user_from["id"])
+    user_info = {
+        "username": user_from.get("username"),
+        "first_name": user_from.get("first_name"),
+        "last_name": user_from.get("last_name"),
+    }
     chat_id = str(message["chat"]["id"])
 
     # Strip @botname suffix
@@ -42,4 +54,4 @@ def route_update(update: dict, deps: Deps) -> None:
     command = parts[0].split("@")[0].lower()
     args = parts[1] if len(parts) > 1 else ""
 
-    handle_command(command, args, user_id, chat_id, deps)
+    handle_command(command, args, user_id, chat_id, deps, user_info)

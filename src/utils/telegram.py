@@ -4,12 +4,45 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Protocol
 
 import httpx
 
 logger = logging.getLogger("scala40.telegram")
 
 BASE_URL = "https://api.telegram.org/bot{token}"
+
+
+class TelegramClientProtocol(Protocol):
+    def send_message(
+        self,
+        chat_id: str | int,
+        text: str,
+        reply_markup: dict | None = None,
+        parse_mode: str = "HTML",
+    ) -> dict:
+        ...
+
+    def edit_message(
+        self,
+        chat_id: str | int,
+        message_id: int,
+        text: str,
+        reply_markup: dict | None = None,
+        parse_mode: str = "HTML",
+    ) -> dict:
+        ...
+
+    def answer_callback_query(
+        self,
+        callback_query_id: str,
+        text: str | None = None,
+        show_alert: bool = False,
+    ) -> dict:
+        ...
+
+    def delete_message(self, chat_id: str | int, message_id: int) -> dict:
+        ...
 
 
 class TelegramClient:
@@ -70,9 +103,7 @@ class TelegramClient:
             payload["show_alert"] = show_alert
         return self._post("answerCallbackQuery", payload)
 
-    def delete_message(
-        self, chat_id: str | int, message_id: int
-    ) -> dict:
+    def delete_message(self, chat_id: str | int, message_id: int) -> dict:
         return self._post(
             "deleteMessage",
             {"chat_id": chat_id, "message_id": message_id},

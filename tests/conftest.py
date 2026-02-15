@@ -23,14 +23,16 @@ class MockTelegramClient:
         reply_markup: dict | None = None,
         parse_mode: str = "HTML",
     ) -> dict:
-        self.calls.append((
-            "send_message",
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "reply_markup": reply_markup,
-            },
-        ))
+        self.calls.append(
+            (
+                "send_message",
+                {
+                    "chat_id": chat_id,
+                    "text": text,
+                    "reply_markup": reply_markup,
+                },
+            )
+        )
         return {"ok": True, "result": {"message_id": len(self.calls)}}
 
     def edit_message(
@@ -41,15 +43,17 @@ class MockTelegramClient:
         reply_markup: dict | None = None,
         parse_mode: str = "HTML",
     ) -> dict:
-        self.calls.append((
-            "edit_message",
-            {
-                "chat_id": chat_id,
-                "message_id": message_id,
-                "text": text,
-                "reply_markup": reply_markup,
-            },
-        ))
+        self.calls.append(
+            (
+                "edit_message",
+                {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": text,
+                    "reply_markup": reply_markup,
+                },
+            )
+        )
         return {"ok": True, "result": {"message_id": message_id}}
 
     def answer_callback_query(
@@ -58,23 +62,25 @@ class MockTelegramClient:
         text: str | None = None,
         show_alert: bool = False,
     ) -> dict:
-        self.calls.append((
-            "answer_callback_query",
-            {
-                "callback_query_id": callback_query_id,
-                "text": text,
-                "show_alert": show_alert,
-            },
-        ))
+        self.calls.append(
+            (
+                "answer_callback_query",
+                {
+                    "callback_query_id": callback_query_id,
+                    "text": text,
+                    "show_alert": show_alert,
+                },
+            )
+        )
         return {"ok": True}
 
-    def delete_message(
-        self, chat_id: str | int, message_id: int
-    ) -> dict:
-        self.calls.append((
-            "delete_message",
-            {"chat_id": chat_id, "message_id": message_id},
-        ))
+    def delete_message(self, chat_id: str | int, message_id: int) -> dict:
+        self.calls.append(
+            (
+                "delete_message",
+                {"chat_id": chat_id, "message_id": message_id},
+            )
+        )
         return {"ok": True}
 
     def get_calls(self, method: str) -> list[dict]:
@@ -105,3 +111,23 @@ def user_repo():
 @pytest.fixture
 def mock_telegram():
     return MockTelegramClient()
+
+
+@pytest.fixture
+def deps_with_user(game_repo, lobby_repo, user_repo, mock_telegram):
+    from src.bot.deps import Deps
+    from src.game.engine import GameEngine
+    from src.lobby.manager import LobbyManager
+
+    engine = GameEngine(game_repo)
+    lobby_mgr = LobbyManager(lobby_repo, user_repo, engine)
+    deps = Deps(
+        engine=engine,
+        lobby_manager=lobby_mgr,
+        game_repo=game_repo,
+        lobby_repo=lobby_repo,
+        user_repo=user_repo,
+        telegram=mock_telegram,
+    )
+    user_repo.save_user({"userId": "u1", "username": "user1"})
+    return deps, mock_telegram
