@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from src.utils.constants import (
     ACE,
@@ -17,6 +18,17 @@ from src.utils.constants import (
     RANK_NAMES,
     SUIT_SYMBOLS,
 )
+
+
+def _ensure_native(val):
+    """Recursively convert Decimal to int/float."""
+    if isinstance(val, Decimal):
+        return int(val) if val % 1 == 0 else float(val)
+    if isinstance(val, list):
+        return [_ensure_native(v) for v in val]
+    if isinstance(val, dict):
+        return {k: _ensure_native(v) for k, v in val.items()}
+    return val
 
 
 @dataclass(frozen=True)
@@ -216,6 +228,7 @@ class GameState:
 
     @classmethod
     def from_dict(cls, d: dict) -> GameState:
+        d = _ensure_native(d)
         drawn = d.get("drawnFromDiscard")
         return cls(
             game_id=d["gameId"],

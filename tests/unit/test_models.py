@@ -196,3 +196,63 @@ class TestGameState:
         game.drawn_from_discard = Card(suit="h", rank=5, deck=0)
         restored = GameState.from_dict(game.to_dict())
         assert restored.drawn_from_discard == Card(suit="h", rank=5, deck=0)
+
+    def test_from_dict_with_decimal(self):
+        from decimal import Decimal
+
+        d = {
+            "gameId": "game-decimal",
+            "lobbyId": "lobby-1",
+            "players": [
+                {
+                    "userId": "p1",
+                    "hand": [{"suit": "h", "rank": Decimal("8"), "deck": Decimal("0")}],
+                    "hasOpened": False,
+                    "isEliminated": False,
+                    "score": Decimal("42"),
+                }
+            ],
+            "deck": [],
+            "discardPile": [],
+            "tableGames": [],
+            "currentTurnUserId": "p1",
+            "turnPhase": "draw",
+            "roundNumber": Decimal("1"),
+            "dealerUserId": "p2",
+            "firstRoundComplete": False,
+            "smazzataNumber": Decimal("5"),
+            "scores": {"p1": Decimal("0"), "p2": Decimal("10")},
+            "status": "playing",
+            "settings": {"elimination_score": Decimal("101.0")},
+            "updatedAt": "2025-01-01T00:00:00Z",
+            "version": Decimal("2"),
+        }
+        game = GameState.from_dict(d)
+
+        # Check explicit integer fields
+        assert isinstance(game.smazzata_number, int)
+        assert game.smazzata_number == 5
+        assert isinstance(game.round_number, int)
+        assert game.round_number == 1
+        assert isinstance(game.version, int)
+        assert game.version == 2
+
+        # Check nested structures
+        assert isinstance(game.scores["p2"], int)
+        assert game.scores["p2"] == 10
+
+        # Check float/int conversion
+        # 101.0 % 1 == 0 -> int
+        assert isinstance(game.settings["elimination_score"], int)
+        assert game.settings["elimination_score"] == 101
+
+        # Check nested objects
+        p1 = game.players[0]
+        assert isinstance(p1.score, int)
+        assert p1.score == 42
+
+        card = p1.hand[0]
+        assert isinstance(card.rank, int)
+        assert card.rank == 8
+        assert isinstance(card.deck, int)
+        assert card.deck == 0
